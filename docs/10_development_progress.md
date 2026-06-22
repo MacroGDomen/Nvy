@@ -28,6 +28,14 @@
 | 0.4 | 建立统一 `desktopApi` 适配层 | 已完成 | 前端已通过 `src/services/desktopApi` 封装 Tauri command；Rust 侧已注册 app 和 database 命令 |
 | 0.5 | 建立最小测试基线 | 已完成 | 已接入 Vitest，新增纯 TypeScript 单元测试；`pnpm test` 通过 |
 | 1.1 | 设计 SQLite schema 与迁移机制 | 已完成 | 已新增 SQLite 初始迁移、Rust 初始化逻辑和幂等测试；`cargo test` 通过 |
+| 1.2 | 实现本地账号表和密码哈希 | 已完成 | 已实现账号注册、输入校验和 Argon2 密码哈希 |
+| 1.3 | 实现登录和当前账号上下文 | 已完成 | 已实现登录校验和前端当前账号上下文 |
+| 1.4 | 实现账号数据隔离基础查询 | 已完成 | 已建立按 `account_id` 隔离的后端查询基础 |
+| 1.5 | 初始化默认账号设置和默认提示词 | 已完成 | 新账号自动拥有默认推荐参考数 30、默认推荐提示词和翻译提示词 |
+| 1.6 | 初始化预置标签库 | 已完成 | 新账号自动拥有影片预置标签和女优预置标签 |
+| 2.1 | 登录 / 注册页 | 已完成 | 已提供最小登录 / 注册页，错误提示清楚，不暴露底层错误 |
+| 2.2 | 登录态路由保护 | 已完成 | 已建立最小路由保护，未登录只能看到登录页 |
+| 2.3 | 全局左侧折叠状态栏 | 已完成 | 已建立登录后全局左侧折叠状态栏，默认折叠，hover 有 tooltip，点击 logo 可展开，展开后显示中文按钮名和账号名；暂只接入首页占位壳 |
 
 ## 4. 任务记录
 
@@ -609,3 +617,72 @@
 
 1. 进入任务 2.3：全局左侧折叠状态栏。
 2. 任务 2.4 基础页面路由应在 2.3 之后接入左侧导航。
+
+## 9. 2026-06-22 第四批补充进度记录
+
+### 任务 2.3 全局左侧折叠状态栏
+
+- 开始时间：2026-06-22
+- 完成时间：2026-06-22
+- 当前状态：已完成
+- 任务目标：为登录后的页面建立全局左侧状态栏。默认折叠只显示图标，hover 有 tooltip，点击 logo 可展开，展开后显示中文按钮名和账号名。本阶段只接入首页占位壳，不实现完整页面路由切换（路由是后续 2.4）。
+
+#### 已创建或修改的文件
+
+| 文件 / 目录 | 作用 |
+|---|---|
+| `src/components/layout/icons.tsx` | 新增侧栏内联 SVG 图标集（首页星火、女优人像、影片影像、设置齿轮、账号头像、收起箭头） |
+| `src/components/layout/Sidebar.tsx` | 新增全局左侧折叠状态栏组件，含折叠 / 展开切换、图标 tooltip、选中态和账号名展示 |
+| `src/components/layout/AppShell.tsx` | 新增登录后布局壳，组合 Sidebar 和页面内容 |
+| `src/app/App.tsx` | 登录后用 `AppShell` 包裹首页占位壳 |
+
+#### 设计说明
+
+| 规则 | 实现方式 |
+|---|---|
+| 默认折叠只显示图标 | `Sidebar` 内部 `expanded` 状态默认为 `false`，折叠态宽度 `w-16` |
+| hover 有 tooltip | 折叠态下每个图标按钮和账号头像用既有 `Tooltip` 包裹；展开态不重复显示 |
+| 点击 logo 可展开 | logo 按钮点击切换 `expanded`；hover logo 时 tooltip 提示"展开 / 收起状态栏" |
+| 展开后显示中文按钮名 | 展开态宽度 `w-56`，按钮显示中文标签 |
+| 展开后显示账号名 | 展开态底部账号区显示用户名和首字母头像 |
+| 当前选中项有选中态 | 选中项使用淡紫半透明底色 `rgba(159,136,219,0.18)` |
+| 设置和账号固定底部 | 通过 `NAV_ITEMS`（首页 / 女优库 / 影片库）和 `FOOTER_ITEMS`（设置 / 账号）分区 |
+| 展开 / 收起平滑动效 | 使用 `transition-[width] duration-200` |
+| 不引入新图标库 | 全部图标为内联 SVG，符合"现有样式先完成最小状态栏" |
+| 暂不实现完整路由切换 | `AppShell` 内部维护 `activeId` 仅供选中态切换；`onSelect` 不切换页面，页面路由留给 2.4 |
+
+#### 暂未实现（明确属于后续任务）
+
+| 内容 | 归属任务 |
+|---|---|
+| 首页 / 女优库 / 影片库 / 设置页真实页面路由切换 | 2.4 基础页面路由 |
+| 全局错误提示与确认弹窗 | 2.5 全局错误提示与确认弹窗基础 |
+| 首页轮播、AI 对话框 | 阶段 9 视觉完成 |
+
+#### 验收结果
+
+| 验收标准（来自 `docs/09_mvp_development_plan.md` 2.3） | 结果 |
+|---|---|
+| 默认折叠只显示图标 | 通过，折叠态 `w-16` 且按钮只渲染图标 |
+| hover 有 tooltip | 通过，折叠态下每个图标按钮和账号头像都接入 `Tooltip` |
+| 点击 logo 可展开 | 通过，logo 按钮 `onClick` 切换 `expanded` |
+
+#### 本轮验证命令
+
+| 命令 | 结果 |
+|---|---|
+| `C:\Users\Chanis\.cargo\bin\cargo.exe fmt --manifest-path src-tauri\Cargo.toml --check` | 通过 |
+| `corepack pnpm test` | 通过，4 个测试文件，9 个测试用例 |
+| `corepack pnpm build` | 通过，TypeScript 和 Vite 构建成功 |
+| `C:\Users\Chanis\.cargo\bin\cargo.exe check --manifest-path src-tauri\Cargo.toml` | 通过，无警告 |
+| `C:\Users\Chanis\.cargo\bin\cargo.exe test --manifest-path src-tauri\Cargo.toml` | 通过，7 个 Rust 测试用例 |
+
+#### 当前阻塞
+
+无。本轮未启动 `tauri:dev` 窗口验证，按任务约束避免遗留长期运行进程；视觉验收留给后续阶段 9 或用户手动确认。
+
+#### 下一步建议
+
+1. 进入任务 2.4：基础页面路由。
+2. 2.4 应把 `AppShell` 内部的 `activeId` 替换为真实路由 store，并接入 `HomePage`、`VideosPage`、`ActressesPage`、`SettingsPage`。
+3. 后续真实页面接入后，再决定是否需要为 `Sidebar` 补充 Vitest 单元测试（如选中态、展开 / 折叠切换的纯逻辑提取）。
