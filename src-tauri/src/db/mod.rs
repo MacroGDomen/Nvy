@@ -2,8 +2,14 @@ use rusqlite::{params, Connection};
 use std::{fs, path::PathBuf};
 use tauri::{AppHandle, Manager};
 
-const LATEST_SCHEMA_VERSION: i64 = 1;
-const MIGRATIONS: &[(i64, &str)] = &[(1, include_str!("../../migrations/001_initial_schema.sql"))];
+const LATEST_SCHEMA_VERSION: i64 = 2;
+const MIGRATIONS: &[(i64, &str)] = &[
+    (1, include_str!("../../migrations/001_initial_schema.sql")),
+    (
+        2,
+        include_str!("../../migrations/002_metadata_cookie_access.sql"),
+    ),
+];
 
 pub fn database_path(app: &AppHandle) -> Result<PathBuf, Box<dyn std::error::Error>> {
     let data_dir = app.path().app_data_dir()?;

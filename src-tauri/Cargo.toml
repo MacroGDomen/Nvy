@@ -15,9 +15,17 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 tauri = { version = "2", features = [] }
 tauri-plugin-opener = "2"
+tauri-plugin-stronghold = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 rusqlite = { version = "0.37", features = ["bundled"] }
 argon2 = "0.5"
 rand_core = { version = "0.6", features = ["getrandom"] }
 uuid = { version = "1", features = ["v4"] }
+aes-gcm = "0.10"
+base64 = "0.22"
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "rustls-tls"] }
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Security_Cryptography"] }
+
+[profile.dev.package.scrypt]
+opt-level = 3

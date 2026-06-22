@@ -1,6 +1,10 @@
 import type { AccountSession } from "../services/desktopApi/types";
 
-export type AppRoute = "auth" | "home";
+export type ProtectedRoute = "home" | "actresses" | "videos" | "settings";
+
+export type AppRoute = "auth" | ProtectedRoute;
+
+export const DEFAULT_AUTHENTICATED_ROUTE: ProtectedRoute = "home";
 
 export function resolveRoute(
   requestedRoute: AppRoute,
@@ -11,7 +15,7 @@ export function resolveRoute(
   }
 
   if (requestedRoute === "auth") {
-    return "home";
+    return DEFAULT_AUTHENTICATED_ROUTE;
   }
 
   return requestedRoute;

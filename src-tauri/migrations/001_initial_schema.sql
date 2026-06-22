@@ -128,4 +128,3 @@ CREATE INDEX idx_videos_account_code ON videos(account_id, code);
 CREATE INDEX idx_videos_account_work_type ON videos(account_id, work_type);
 CREATE INDEX idx_actresses_account_name ON actresses(account_id, name);
 CREATE INDEX idx_tag_library_account_scope ON tag_library(account_id, scope);
-

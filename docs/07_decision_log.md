@@ -541,6 +541,83 @@
 - 后续行动：
   - 开发计划阶段再拆分 Tauri Stronghold、导出包生成、导出包校验和导入恢复任务。
 
+## D020 第一版导入导出基础实现方式
+
+- 日期：2026-06-22
+- 决策：
+  - 第一版 `.nvyzip` 使用 Windows 系统 PowerShell `Compress-Archive` / `Expand-Archive` 生成和读取真实 zip 包，不新增 Rust 压缩依赖。
+  - `.nvyzip` 包含 `manifest.json`、`data.json`、`assets/` 和 `checksums.json`。
+  - `checksums.json` 第一版使用内部 `fnv1a64` 校验值，用于发现导入包损坏或条目不匹配。
+  - `.nvyenc` 对完整 `.nvyzip` 包体加密；密码经 Argon2 派生主密钥后生成加密流。
+  - 导入恢复到当前登录账号，不导出或恢复账号密码、密码哈希或明文 API Key。
+- 背景：
+  - 用户要求完成 6.4-6.8。
+  - 当前项目不应擅自新增未经确认的第三方依赖；同时产品规格要求 `.nvyzip` 本质为 zip 包。
+  - 第一版目标平台是 Windows 10 / Windows 11，本地系统 zip 能力可以满足 MVP 备份恢复需求。
+- 影响：
+  - 普通导出文件可以被 zip 工具打开，会暴露资料内容；设置页需清楚区分普通导出和加密导出。
+  - 加密导出密码丢失后无法恢复。
+  - 导入会替换当前登录账号下的影片、女优、标签、关联、设置和缓存资源引用。
+  - 同一个数据库内从其他账号备份导入时，如果记录 id 与现有记录冲突，会为导入目标账号重映射记录 id，并同步修正关联表。
+- 备选方案：
+  - 引入 `zip`、`sha2`、`aes-gcm` 等 Rust 依赖。
+  - 直接导出 SQLite 数据库文件。
+- 暂不选择原因：
+  - 新增压缩和加密依赖需要单独确认依赖边界、学习成本和维护风险。
+  - 直接导出 SQLite 文件不符合已确认的 manifest/data/assets/checksums 包结构，也不利于后续版本迁移。
+- 风险：
+  - PowerShell 压缩能力是 Windows 依赖；若未来扩展到 macOS / Linux，需要替换为跨平台压缩实现。
+  - `fnv1a64` 是完整性校验，不是密码学防篡改签名；如未来需要更强安全性，应升级为 SHA-256 / HMAC。
+  - 当前加密实现满足“不直接明文读取”的 MVP 目标，但未来如要提高安全等级，应替换为成熟 AEAD 方案。
+- 后续行动：
+  - 阶段 10 做 1999 条数据规模下导入导出耗时和稳定性测试。
+  - 后续确认是否引入跨平台 zip、SHA-256 和 AEAD 加密依赖。
+
+## D024 阶段 7 元数据匹配先完成候选闭环
+
+- 日期：2026-06-22
+- 决策：
+  - 阶段 7 先实现统一候选结构、候选缓存、匹配入口、候选确认、确认写入和失败兜底。
+  - 当前实现使用本地占位候选适配器，不直接联网访问 gfriends、DMM/FANZA 或 JavSP。
+  - 真实外部来源适配保留为后续外部接口验证项，接入时复用同一候选结构和确认流程。
+- 背景：
+  - gfriends、DMM/FANZA、JavSP 的许可证、接口稳定性、访问限制和地区限制仍需要开发时验证。
+  - 当前环境无法可靠验证真实网络请求。
+  - 元数据匹配的产品底线是“不静默覆盖、可跳过、可手动编辑”，候选闭环可以先独立完成。
+- 影响：
+  - 影片详情和女优详情已经具备匹配按钮、候选展示、使用候选和跳过流程。
+  - 后续真实来源只需要替换候选生成部分，不需要重做 UI 确认和写入流程。
+  - 当前占位适配器不能代表真实外部数据质量，最终验收仍需接入或验证真实来源。
+- 备选方案：
+  - 直接写死某个第三方站点抓取逻辑。
+  - 等所有外部来源确认后再开始阶段 7。
+- 暂不选择原因：
+  - 写死第三方来源会放大许可证、稳定性和维护风险。
+  - 完全等待外部来源会阻塞候选确认、写入和失败兜底这些本地可验证能力。
+- 后续行动：
+  - 验证 gfriends、DMM/FANZA、JavSP 或替代来源的可用性和许可边界。
+  - 用真实来源替换本地占位候选适配器。
+  - 补充真实封面 / 头像下载后进入现有图片缓存服务的手动或自动验收。
+
+## D025 阶段 8 先完成非敏感设置和推荐 payload 边界
+
+- 日期：2026-06-22
+- 决策：阶段 8 先实现大模型非敏感设置、提示词保存、推荐参考总数校验、首页推荐候选 payload 构造、影片详情翻译入口和失败兜底；API Key 不写入 SQLite，真实 Tauri Stronghold 存储、解锁策略和 HTTP 模型客户端留作后续接入项。
+- 背景：当前项目尚未接入 `tauri-plugin-stronghold` 或 Rust HTTP 客户端。为了遵守“不引入未经确认的新依赖”和“API Key 不得明文保存”的安全边界，本轮不使用临时明文文件或 SQLite 字段替代 Stronghold。
+- 理由：
+  - 非敏感设置和提示词已经有 `account_settings` 表支撑，可以先完成并稳定 UI 和校验规则。
+  - 首页推荐 payload 的隐私边界可以本地验证，能先确保不包含密码、API Key 和本地绝对路径。
+  - Stronghold 接入涉及依赖、解锁方式、多账号隔离和迁移策略，不应伪装为已完成。
+- 影响：
+  - 设置页可保存接口类型、Base URL、模型、供应商备注、温度、最大输出长度、推荐参考总数上限和两类提示词。
+  - 首页可构造推荐候选并应用 0-999 上限，其中 0 表示不限。
+  - 重新翻译入口存在，但真实模型调用前会提示配置或客户端尚未完成。
+  - 取消翻译会优先回退到原始标题 / 简介；没有原始字段时保留当前字段，避免误删手工资料。
+- 后续行动：
+  - 接入 Tauri Stronghold，并定义账号级 API Key 存储 key、解锁方式和清除策略。
+  - 接入真实 HTTP 客户端，实现 OpenAI Responses API、OpenAI 兼容 Chat Completions 和自定义接口分流。
+  - 接入真实模型调用后复验推荐、自动翻译、重新翻译、取消翻译和网络失败兜底。
+
 ## D017 女优姓名归一化第一版使用自建规则
 
 - 日期：2026-06-21
@@ -738,3 +815,62 @@
   1. 普通 SHA 系列摘要：暂不选择，因为不适合作为密码存储默认方案。
   2. bcrypt：成熟可用，但第一版先采用 Argon2，避免同时引入多套密码哈希策略。
   3. 明文保存：不符合需求，明确排除。
+## D026 Tauri Stronghold API Key 保存采用最小闭环接入
+- 日期：2026-06-22
+- 状态：已实现，待 Rust 新依赖下载后复验
+- 决策：
+  - 第一版 API Key 保存接入 `tauri-plugin-stronghold`，并在 Tauri capability 中开放 Stronghold 默认权限和删除记录权限。
+  - 前端通过 `src/services/stronghold/llmSecrets.ts` 调用 Stronghold 插件命令，完成 API Key 保存、查询、读取和清除。
+  - SQLite 继续只保存 Base URL、模型型号 / 模型 ID、温度、最大输出长度、提示词、推荐参考总数上限等非敏感设置，不保存明文 API Key。
+  - Stronghold record key 按 `account_id` 隔离；普通导出和加密导出均不包含 API Key。
+  - 当前最小实现使用应用级 Stronghold 解锁口令加本机 salt；后续如需更强本机安全，可升级为登录密码派生解锁口令。
+- 背景：
+  - 产品规格已确认 API Key 必须本地加密保存，且第一版采用 Tauri Stronghold。
+  - 真实大模型推荐和翻译依赖可读取的 API Key，但 HTTP 客户端调用不纳入本次最小闭环。
+- 影响：
+  - `src-tauri/Cargo.toml` 新增 `tauri-plugin-stronghold`。
+  - `src-tauri/src/lib.rs` 注册 Stronghold 插件。
+  - `src-tauri/capabilities/default.json` 新增 Stronghold 权限。
+  - 设置页可保存和清除 API Key，`getLlmSettings` 会从 Stronghold 状态合并 `hasApiKey`。
+- 风险：
+  - 当前环境无法下载新的 Rust crate，因此 Rust 桌面端编译和真实保存文件检查仍待复验。
+  - 后续 HTTP 客户端接入时，需要决定 API Key 从 Stronghold 读取后在 Rust 侧使用，还是由前端读取后只作为一次性调用参数传入。
+## D027 元数据来源读取浏览器 Cookie 采用用户显式开关
+- 日期：2026-06-22
+- 状态：已确认并已实现设置项
+- 决策：第一版新增“允许元数据来源读取浏览器 Cookie”设置项，默认关闭。该设置仅保存用户选择，不默认读取、不存储浏览器 Cookie。若番号元数据获取失败，用户可在明确接受隐私风险后手动打开。
+- 背景：JavSP 的 JavDB 逻辑在遇到登录跳转时可能读取本机浏览器 Cookie。无 Cookie 情况下，JavBus 官方来源已验证可根据多个番号获取标题、封面、发布日期、女优、标签等核心元数据；JavDB/JavLibrary 当前存在 Cloudflare、停放页或登录限制风险。
+- 影响：`account_settings` 新增 `metadata_allow_browser_cookies` 非敏感布尔设置，导入导出会保留该选择；真正读取 Cookie 的实现仍必须受该开关控制，且不能在默认关闭状态下触碰浏览器凭据。
+- 风险：打开后可能接触本机浏览器登录凭据，属于敏感本机数据访问；后续接入真实来源时需要避免日志、导出包、错误信息或候选缓存泄露 Cookie 内容。
+
+## D028 元数据浏览器 Cookie 读取采用最小闭环接入
+
+- 日期：2026-06-22
+- 状态：已实现最小闭环
+- 决策：在 `metadata_allow_browser_cookies` 开关开启时，Rust 元数据模块可读取 Chrome / Edge 的本机 Cookie 数据库，筛选 JavDB / JavLibrary / JavBus 相关域名 Cookie，并通过 Windows DPAPI 与 Chromium AES-GCM 格式解密后生成内存态 Cookie header。
+- 边界：
+  - 默认关闭时不访问浏览器目录。
+  - Cookie 不写入 SQLite。
+  - Cookie 不进入导入导出包。
+  - Cookie 不写入日志、错误信息或元数据候选缓存。
+  - 当前真实外部元数据适配器仍未接入，Cookie header 先作为后续 JavDB / JavSP 请求适配的内部准备能力。
+- 影响：`src-tauri/Cargo.toml` 新增 `aes-gcm`、`base64`、`windows-sys` 依赖；`src-tauri/src/metadata/browser_cookies.rs` 负责浏览器 Cookie 发现、复制读取、域名过滤、过期过滤、解密和 header 组装。
+- 风险：用户开启后会触碰本机浏览器登录凭据。后续接入真实网络请求时，必须继续保持最小发送范围，只发送给对应元数据来源，且不得在调试输出、候选 payload、备份或错误提示中泄露 Cookie。
+
+## D029 影片元数据真实来源先接入 JavBus
+
+- 日期：2026-06-22
+- 状态：已实现
+- 决策：第一版影片元数据匹配不再只使用本地占位候选，先接入真实 JavBus 详情页作为外部来源。匹配时默认附带 JavBus 年龄确认 Cookie；若用户开启“允许元数据来源读取浏览器 Cookie”，则把本机浏览器 Cookie header 合并进同一次真实请求。
+- 实现范围：
+  - `src-tauri/src/metadata/javbus.rs` 负责 JavBus 请求、年龄验证页识别、详情页解析、封面 URL、标题、番号、发行日期、时长、演员字段抽取。
+  - `src-tauri/src/metadata/mod.rs` 优先使用 JavBus 真实候选；JavBus 未命中或失败时回退本地占位候选，保证手动流程不中断。
+  - `src-tauri/src/assets/mod.rs` 支持确认候选时下载远程封面 URL 到本地缓存目录。
+  - `src-tauri/Cargo.toml` 新增 `reqwest`，用于真实 HTTP 请求。
+- 已验证：
+  - `IPX-177` 和 `SSNI-589` 在 JavBus 年龄确认 Cookie 下可返回真实详情页。
+  - Rust 单元测试覆盖 JavBus 解析、年龄验证页识别、Cookie 合并、远程图片扩展名识别。
+- 风险：
+  - JavBus 页面结构变化会影响解析，需要后续真实回归覆盖。
+  - 当前女优详情元数据仍未接入真实外部来源。
+  - 当前 gfriends、DMM / FANZA API、JavDB 仍未作为生产适配器接入；本轮先完成已经验证能跑通的 JavBus 影片元数据闭环。

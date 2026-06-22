@@ -1,4 +1,10 @@
 pub mod app;
+pub mod assets;
 pub mod auth;
+pub mod backup;
 pub mod database;
 pub mod defaults;
+pub mod library;
+pub mod llm;
+pub mod metadata;
+pub mod tags;

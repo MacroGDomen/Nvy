@@ -3,6 +3,10 @@
   "identifier": "default",
   "description": "Default capability for the main Nvy window",
   "windows": ["main"],
-  "permissions": ["core:default", "opener:default"]
+  "permissions": [
+    "core:default",
+    "opener:default",
+    "stronghold:default",
+    "stronghold:allow-remove-store-record"
+  ]
 }
-

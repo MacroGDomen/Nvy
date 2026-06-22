@@ -559,7 +559,7 @@ OpenAI 接口说明：设置中需要支持 OpenAI Responses API。OpenAI 官方
 | 标签库 | canonical_name | 字符串 | 是 | 规范标签名，必须为中文标签 |
 | 标签库 | aliases | 字符串列表 | 否 | 同义词、繁体写法或近义词，例如 `媚藥`、`春药` |
 | 标签库 | related_tags | 字符串列表 | 否 | 关联标签，例如 `按摩` 与 `精油` |
-| 账号设置 | api_key_encrypted | 字符串 | 否 | 加密保存后的大模型 API Key |
+| 大模型密钥 | stronghold_record | 本地加密记录 | 否 | API Key 使用 Tauri Stronghold 按账号保存；不写入 SQLite、普通导出或加密导出的 data.json |
 | 账号设置 | llm_api_type | 枚举 | 否 | 接口类型：OpenAI Responses API / OpenAI 兼容 Chat Completions / 自定义接口 |
 | 账号设置 | llm_base_url | 字符串 | 否 | 大模型 API 地址 |
 | 账号设置 | llm_provider_name | 字符串 | 否 | 供应商名称或用户备注 |

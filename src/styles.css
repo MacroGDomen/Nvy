@@ -5,25 +5,27 @@
 }
 
 :root {
-  --color-background: #101014;
-  --color-panel: rgba(31, 30, 39, 0.74);
+  --color-background: #111114;
+  --color-panel: rgba(30, 29, 36, 0.78);
+  --color-panel-elevated: rgba(38, 36, 45, 0.92);
   --color-surface: #22212a;
-  --color-surface-soft: rgba(41, 39, 50, 0.62);
-  --color-surface-strong: #302d3a;
-  --color-surface-hover: #3b3747;
-  --color-input: #18171f;
-  --color-border: rgba(255, 255, 255, 0.09);
-  --color-text: #edeaf4;
+  --color-surface-soft: rgba(40, 38, 48, 0.66);
+  --color-surface-strong: #302d39;
+  --color-surface-hover: #3a3544;
+  --color-input: #18171e;
+  --color-border: rgba(255, 255, 255, 0.1);
+  --color-border-strong: rgba(205, 190, 242, 0.24);
+  --color-text: #eeeaf4;
   --color-text-strong: #fffaff;
-  --color-muted: #c7c0d3;
-  --color-muted-subtle: #7e778b;
-  --color-accent: #9f88db;
-  --color-accent-hover: #b09aea;
-  --color-accent-pink: #d386aa;
+  --color-muted: #c9c1d4;
+  --color-muted-subtle: #888191;
+  --color-accent: #a58cdf;
+  --color-accent-hover: #b69deb;
+  --color-accent-pink: #d58bad;
   --color-accent-soft: #cdbef2;
   --color-accent-foreground: #17131f;
-  --color-danger: #b75b74;
-  --color-danger-hover: #cc6b86;
+  --color-danger: #a95770;
+  --color-danger-hover: #bf667f;
   --color-danger-foreground: #fff4f7;
   --color-focus: #bda8f2;
   --color-focus-soft: rgba(189, 168, 242, 0.18);
@@ -46,10 +48,7 @@ body {
   min-width: 320px;
   min-height: 100vh;
   margin: 0;
-  background:
-    radial-gradient(circle at 50% 18%, rgba(137, 102, 190, 0.24), transparent 32rem),
-    radial-gradient(circle at 70% 64%, rgba(201, 113, 160, 0.14), transparent 26rem),
-    var(--color-background);
+  background: linear-gradient(180deg, #141318 0%, var(--color-background) 42%, #0f0f12 100%);
 }
 
 button,
@@ -57,4 +56,34 @@ input,
 textarea,
 select {
   font: inherit;
+}
+
+::selection {
+  background: rgba(189, 168, 242, 0.28);
+  color: var(--color-text-strong);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(205, 190, 242, 0.22);
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(205, 190, 242, 0.34);
+  background-clip: content-box;
+}
+
+input[type="checkbox"] {
+  accent-color: var(--color-accent);
 }

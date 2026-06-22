@@ -104,8 +104,9 @@ fn insert_default_settings(connection: &Connection, account_id: &str) -> Result<
                 llm_translation_prompt,
                 llm_recommendation_prompt,
                 enable_llm_translation,
-                llm_recommendation_default_enabled
-            ) VALUES (?1, ?2, ?3, ?4, 0, 1)",
+                llm_recommendation_default_enabled,
+                metadata_allow_browser_cookies
+            ) VALUES (?1, ?2, ?3, ?4, 0, 1, 0)",
             params![
                 account_id,
                 DEFAULT_RECOMMENDATION_REFERENCE_LIMIT,
@@ -175,14 +176,15 @@ mod tests {
             register_account(&db_path, "PromptUser", "abc123").expect("account registers");
 
         let connection = Connection::open(&db_path).expect("database opens");
-        let row: (i64, String, String, i64, i64) = connection
+        let row: (i64, String, String, i64, i64, i64) = connection
             .query_row(
                 "SELECT
                     llm_recommendation_reference_limit,
                     llm_translation_prompt,
                     llm_recommendation_prompt,
                     enable_llm_translation,
-                    llm_recommendation_default_enabled
+                    llm_recommendation_default_enabled,
+                    metadata_allow_browser_cookies
                  FROM account_settings
                  WHERE account_id = ?1",
                 params![session.account_id],
@@ -193,6 +195,7 @@ mod tests {
                         row.get(2)?,
                         row.get(3)?,
                         row.get(4)?,
+                        row.get(5)?,
                     ))
                 },
             )
@@ -203,6 +206,7 @@ mod tests {
         assert_eq!(row.2, DEFAULT_RECOMMENDATION_PROMPT);
         assert_eq!(row.3, 0);
         assert_eq!(row.4, 1);
+        assert_eq!(row.5, 0);
 
         let _ = fs::remove_file(db_path);
     }

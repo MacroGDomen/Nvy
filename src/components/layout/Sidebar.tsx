@@ -1,8 +1,8 @@
 import { useState, type ReactNode } from "react";
+import type { ProtectedRoute } from "../../app/router";
 import { cn } from "../../lib/cn";
 import { Tooltip } from "../ui/Tooltip";
 import {
-  AccountIcon,
   ActressIcon,
   CollapseIcon,
   HomeIcon,
@@ -10,17 +10,8 @@ import {
   VideoIcon,
 } from "./icons";
 
-// Sidebar navigation item ids. These match the pages described in
-// docs/08_page_wireframes.md section 3.1.
-export type SidebarItemId =
-  | "home"
-  | "actresses"
-  | "videos"
-  | "settings"
-  | "account";
-
 type SidebarItem = {
-  id: SidebarItemId;
+  id: ProtectedRoute;
   label: string;
   icon: ReactNode;
 };
@@ -33,23 +24,15 @@ const NAV_ITEMS: SidebarItem[] = [
 
 const FOOTER_ITEMS: SidebarItem[] = [
   { id: "settings", label: "设置", icon: <SettingsIcon className="h-5 w-5" /> },
-  { id: "account", label: "账号", icon: <AccountIcon className="h-5 w-5" /> },
 ];
 
 type SidebarProps = {
-  // Current account username. Shown in the expanded sidebar footer.
   username: string;
-  // Currently highlighted navigation item.
-  activeId: SidebarItemId;
-  // Called when the user picks a navigation item. Route switching itself is
-  // intentionally out of scope for task 2.3 and handled by task 2.4.
-  onSelect?: (id: SidebarItemId) => void;
+  activeRoute: ProtectedRoute;
+  onSelect: (route: ProtectedRoute) => void;
 };
 
-export function Sidebar({ username, activeId, onSelect }: SidebarProps) {
-  // The sidebar defaults to the collapsed icon-only state, matching the
-  // Gemini-style collapsed rail described in the wireframes. Hovering the
-  // logo hints that clicking expands it.
+export function Sidebar({ username, activeRoute, onSelect }: SidebarProps) {
   const [expanded, setExpanded] = useState(false);
 
   function handleLogoClick() {
@@ -72,7 +55,7 @@ export function Sidebar({ username, activeId, onSelect }: SidebarProps) {
             key={item.id}
             item={item}
             expanded={expanded}
-            isActive={item.id === activeId}
+            isActive={item.id === activeRoute}
             onSelect={onSelect}
           />
         ))}
@@ -84,7 +67,7 @@ export function Sidebar({ username, activeId, onSelect }: SidebarProps) {
             key={item.id}
             item={item}
             expanded={expanded}
-            isActive={item.id === activeId}
+            isActive={item.id === activeRoute}
             onSelect={onSelect}
           />
         ))}
@@ -136,7 +119,7 @@ type SidebarButtonProps = {
   item: SidebarItem;
   expanded: boolean;
   isActive: boolean;
-  onSelect?: (id: SidebarItemId) => void;
+  onSelect: (route: ProtectedRoute) => void;
 };
 
 function SidebarButton({
@@ -149,7 +132,7 @@ function SidebarButton({
     <button
       type="button"
       aria-current={isActive ? "page" : undefined}
-      onClick={() => onSelect?.(item.id)}
+      onClick={() => onSelect(item.id)}
       className={cn(
         "flex items-center gap-3 rounded-2xl px-2 py-2 text-sm font-medium tracking-normal transition",
         "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-focus)]",
@@ -168,8 +151,6 @@ function SidebarButton({
     return button;
   }
 
-  // Only wrap with tooltip in collapsed mode so the user can still identify
-  // each icon-only entry, matching docs/08_page_wireframes.md A02.
   return <Tooltip label={item.label}>{button}</Tooltip>;
 }
 
