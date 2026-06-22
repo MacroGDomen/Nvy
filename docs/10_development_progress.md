@@ -1636,3 +1636,42 @@
 #### 结论
 
 阶段 10 中可以在当前环境准确完成的 10.1、10.2 前端搜索基线、10.3、10.6 推荐 payload 隐私边界和 10.8 自动化回归已经完成。10.4、10.5、10.7 以及 A044 中涉及真实桌面端、文件导入导出、离线和 Windows 10/11 的部分保持为明确待复验项，不应在 Stronghold / libsodium 构建问题解决前标记为完全通过。
+
+## 24. 2026-06-22 开发启动黑屏 / 首屏加载过慢修复记录
+
+### 问题现象
+
+- 使用 `corepack pnpm tauri:dev` 启动后，Tauri 窗口黑屏。
+- 浏览器访问 `http://127.0.0.1:1420/` 长时间转圈，约 5 分钟后才显示。
+
+### 根因
+
+- Tailwind CSS v4 默认自动扫描源码。
+- 仓库根目录下存在大量非源码目录：`Temp/` 约 107317 个文件，`src-tauri/target/` 约 16621 个文件，另有 `.research-*` 研究目录。
+- `src/styles.css` 原先使用 `@import "tailwindcss";`，没有限制 Tailwind 扫描范围。
+- Vite dev server 的文件监听也没有显式忽略这些大型目录。
+- 首次请求 CSS / 前端模块时，开发服务器会被大量无关文件拖慢，表现为浏览器转圈和 Tauri 黑屏。
+
+### 修复内容
+
+| 文件 | 修改 |
+|---|---|
+| `src/styles.css` | 改为 `@import "tailwindcss" source(none);`，并用 `@source ".";` 只扫描 `src/` 目录 |
+| `vite.config.ts` | `server.watch.ignored` 忽略 `src-tauri/target/`、`Temp/`、`.research-*`、`.pnpm-store/`、`dist/` |
+| `.gitignore` | 忽略 `Temp/` 和 `.research-*/`，避免临时研究文件继续进入项目扫描范围 |
+
+### 验证结果
+
+| 验证项 | 结果 |
+|---|---|
+| `corepack pnpm build` | 通过，Vite build 约 2.15 秒 |
+| `corepack pnpm test` | 通过，8 个测试文件，25 个测试用例 |
+| `cargo test --manifest-path .\src-tauri\Cargo.toml` | 通过，33 个测试 |
+| `corepack pnpm tauri:dev` | Vite ready 约 791ms，Rust dev 编译约 1.32s |
+| `http://127.0.0.1:1420/` 首次请求 | 约 165ms |
+| `http://127.0.0.1:1420/src/styles.css` 首次请求 | 约 854ms |
+| `http://127.0.0.1:1420/src/main.tsx` 首次请求 | 约 676ms |
+
+### 结论
+
+首屏黑屏 / 浏览器长时间转圈的主要原因是开发服务器扫描了大量非源码文件。当前已通过限制 Tailwind 扫描范围、忽略 Vite watcher 大目录、忽略临时研究目录完成修复。

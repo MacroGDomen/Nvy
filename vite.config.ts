@@ -8,7 +8,16 @@ export default defineConfig({
   server: {
     host: "127.0.0.1",
     port: 1420,
-    strictPort: true
+    strictPort: true,
+    watch: {
+      ignored: [
+        "**/src-tauri/target/**",
+        "**/Temp/**",
+        "**/.research-*/**",
+        "**/.pnpm-store/**",
+        "**/dist/**"
+      ]
+    }
   },
   envPrefix: ["VITE_", "TAURI_"]
 });

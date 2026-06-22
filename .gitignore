@@ -4,6 +4,8 @@ dist/
 dist-ssr/
 target/
 src-tauri/target/
+Temp/
+.research-*/
 .DS_Store
 *.log
 *.local
