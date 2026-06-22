@@ -1,0 +1,60 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: Inter, "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+:root {
+  --color-background: #101014;
+  --color-panel: rgba(31, 30, 39, 0.74);
+  --color-surface: #22212a;
+  --color-surface-soft: rgba(41, 39, 50, 0.62);
+  --color-surface-strong: #302d3a;
+  --color-surface-hover: #3b3747;
+  --color-input: #18171f;
+  --color-border: rgba(255, 255, 255, 0.09);
+  --color-text: #edeaf4;
+  --color-text-strong: #fffaff;
+  --color-muted: #c7c0d3;
+  --color-muted-subtle: #7e778b;
+  --color-accent: #9f88db;
+  --color-accent-hover: #b09aea;
+  --color-accent-pink: #d386aa;
+  --color-accent-soft: #cdbef2;
+  --color-accent-foreground: #17131f;
+  --color-danger: #b75b74;
+  --color-danger-hover: #cc6b86;
+  --color-danger-foreground: #fff4f7;
+  --color-focus: #bda8f2;
+  --color-focus-soft: rgba(189, 168, 242, 0.18);
+  --shadow-panel: 0 24px 90px rgba(0, 0, 0, 0.42);
+  --shadow-glow: 0 12px 32px rgba(159, 136, 219, 0.28);
+  font-family: var(--font-sans);
+  color: var(--color-text);
+  background: var(--color-background);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+  background:
+    radial-gradient(circle at 50% 18%, rgba(137, 102, 190, 0.24), transparent 32rem),
+    radial-gradient(circle at 70% 64%, rgba(201, 113, 160, 0.14), transparent 26rem),
+    var(--color-background);
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}

@@ -67,7 +67,7 @@
 ## 4. 文档结构
 
 ```text
-docs/
+  docs/
   00_project_brief.md
   01_user_profile.md
   02_product_spec.md
@@ -77,6 +77,8 @@ docs/
   06_acceptance_tests.md
   07_decision_log.md
   08_page_wireframes.md
+  09_mvp_development_plan.md
+  10_development_progress.md
 ```
 
 ## 5. 核心文档说明
@@ -92,6 +94,8 @@ docs/
 | `docs/06_acceptance_tests.md`   | 验收标准和测试场景                         |
 | `docs/07_decision_log.md`       | 重要决策记录                               |
 | `docs/08_page_wireframes.md`    | 第一版 6 个核心页面草图和 UI 风格要求       |
+| `docs/09_mvp_development_plan.md` | 第一版 MVP 开发阶段、任务拆分和实现顺序   |
+| `docs/10_development_progress.md` | 开发任务实际进度、验证结果和阻塞记录       |
 
 ## 6. 工作方式
 

@@ -666,6 +666,38 @@
 - 后续行动：
   - 在新对话中根据已确认文档撰写第一版 MVP 开发计划。
 
+## D022 工程实现阶段采用 Vitest 与 rusqlite
+
+- 日期：2026-06-22
+- 状态：已确认
+- 决策：第一版工程实现中，前端 / TypeScript 纯逻辑单元测试采用 Vitest；Tauri / Rust 侧 SQLite 访问采用 `rusqlite`，并启用 `bundled` 特性。Playwright 仍作为后续端到端测试候选，暂未接入。
+- 背景：进入最小工程骨架后，任务 0.5 需要建立最小测试基线，任务 1.1 需要建立 SQLite schema 与迁移机制。项目技术栈已确认包含 React + TypeScript + Tauri + SQLite。
+- 选择理由：
+  - Vitest 与 Vite / TypeScript 项目集成成本低，适合先覆盖搜索、标签、姓名归一化等纯逻辑模块。
+  - `rusqlite` 是 Rust 生态成熟 SQLite 访问库，适合 Tauri 命令侧维护本地数据库初始化和迁移。
+  - `rusqlite` 的 `bundled` 特性可以降低 Windows 上系统 SQLite 依赖不一致的问题。
+- 备选方案：
+  - Jest。
+  - 只做手动测试。
+  - Tauri SQL 插件。
+  - 前端直接访问 SQLite。
+- 放弃或暂缓备选方案的原因：
+  - Jest 在 Vite 项目中需要更多配置，当前没有明显收益。
+  - 只做手动测试不利于后续复杂搜索和归一化规则维护。
+  - Tauri SQL 插件可以后续评估，但当前 Rust 侧直接管理迁移更直观。
+  - 前端直接访问 SQLite 会破坏 `desktopApi` 边界，不利于迁移和维护。
+- 影响：
+  - `package.json` 新增 `test` 脚本和 `vitest` 开发依赖。
+  - `src-tauri/Cargo.toml` 新增 `rusqlite` 依赖。
+  - 数据库初始化和迁移逻辑放在 `src-tauri/src/db/`。
+  - 前端通过 `src/services/desktopApi/` 调用 Tauri 命令，不直接依赖 SQLite。
+- 风险：
+  - `rusqlite` bundled 编译会增加首次 Rust 构建时间。
+  - 后续如果改用 SQLCipher 或整体数据库加密，需要迁移 SQLite 访问层。
+- 后续行动：
+  - 后续实现账号、资料库和设置时继续沿用 repository / service 边界。
+  - 在搜索、标签、姓名归一化规则出现时优先补充 Vitest 单元测试。
+
 ## 5. 待确认决策
 
 | 编号   | 决策主题                               | 当前状态 | 影响             |
@@ -689,3 +721,20 @@
 | TBD017 | 包管理工具                             | 已确认：pnpm | 影响依赖安装、锁文件和开发命令 |
 | TBD018 | UI 实现方案                            | 已确认：Tailwind CSS + Radix UI primitives + CSS 变量 | 影响依赖、组件开发速度、视觉一致性和后续维护 |
 | TBD019 | 撤销 / 重做和草稿系统                  | 已确认：第一版不做 | 影响状态管理复杂度和自动保存流程 |
+## D023 - 第一版本地账号密码哈希采用 Argon2
+
+- 日期：2026-06-22
+- 状态：已确认并已实现
+- 决策：第一版 Nvy 的本地账号密码使用 Rust 侧 `argon2` 哈希保存，配合 `rand_core` 生成随机盐，账号 id 使用 `uuid` 生成。
+- 原因：
+  1. 已确认需求要求密码哈希保存，不能明文保存。
+  2. Argon2 是成熟密码哈希方案，避免自制密码存储逻辑。
+  3. 本地账号只用于本机数据隔离，不引入云端账号或服务器同步。
+- 影响范围：
+  1. `src-tauri/src/auth/mod.rs` 负责注册、登录、密码校验和账号数据隔离基础查询。
+  2. 前端通过 `src/services/desktopApi` 调用账号相关 Tauri command，不直接处理哈希。
+  3. 后续导出、日志和错误处理不得暴露密码或密码哈希。
+- 备选方案：
+  1. 普通 SHA 系列摘要：暂不选择，因为不适合作为密码存储默认方案。
+  2. bcrypt：成熟可用，但第一版先采用 Argon2，避免同时引入多套密码哈希策略。
+  3. 明文保存：不符合需求，明确排除。
