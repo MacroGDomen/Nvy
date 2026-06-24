@@ -15,8 +15,8 @@ import type { AccountSession } from "../services/desktopApi/types";
 import { setSession as setStoredSession } from "../services/auth/sessionStore";
 
 type DetailTarget =
-  | { route: "actresses"; id: string }
-  | { route: "videos"; id: string };
+  | { route: "actresses"; id: string; returnRoute: ProtectedRoute }
+  | { route: "videos"; id: string; returnRoute: ProtectedRoute };
 
 export function App() {
   const [session, setReactSession] = useState<AccountSession | null>(null);
@@ -40,7 +40,10 @@ export function App() {
     setRequestedRoute(target.route);
   }
 
-  function handleBackToLibrary() {
+  function handleBackFromDetail() {
+    if (detailTarget?.returnRoute) {
+      setRequestedRoute(detailTarget.returnRoute);
+    }
     setDetailTarget(null);
   }
 
@@ -59,7 +62,7 @@ export function App() {
       <RouteContent
         route={activeRoute}
         detailTarget={detailTarget}
-        onBackToLibrary={handleBackToLibrary}
+        onBackFromDetail={handleBackFromDetail}
         onOpenDetail={handleOpenDetail}
       />
     </AppShell>
@@ -69,14 +72,14 @@ export function App() {
 type RouteContentProps = {
   route: ProtectedRoute;
   detailTarget: DetailTarget | null;
-  onBackToLibrary: () => void;
+  onBackFromDetail: () => void;
   onOpenDetail: (target: DetailTarget) => void;
 };
 
 function RouteContent({
   route,
   detailTarget,
-  onBackToLibrary,
+  onBackFromDetail,
   onOpenDetail,
 }: RouteContentProps) {
   switch (route) {
@@ -84,16 +87,18 @@ function RouteContent({
       return (
         <ActressesPage
           focusActressId={detailTarget?.route === "actresses" ? detailTarget.id : null}
-          onBackToLibrary={onBackToLibrary}
-          onOpenDetail={(id) => onOpenDetail({ route: "actresses", id })}
+          backLabel={detailTarget?.returnRoute === "home" ? "返回首页" : "返回女优库"}
+          onBackToLibrary={onBackFromDetail}
+          onOpenDetail={(id) => onOpenDetail({ route: "actresses", id, returnRoute: "actresses" })}
         />
       );
     case "videos":
       return (
         <VideosPage
           focusVideoId={detailTarget?.route === "videos" ? detailTarget.id : null}
-          onBackToLibrary={onBackToLibrary}
-          onOpenDetail={(id) => onOpenDetail({ route: "videos", id })}
+          backLabel={detailTarget?.returnRoute === "home" ? "返回首页" : "返回影片库"}
+          onBackToLibrary={onBackFromDetail}
+          onOpenDetail={(id) => onOpenDetail({ route: "videos", id, returnRoute: "videos" })}
         />
       );
     case "settings":

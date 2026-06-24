@@ -39,12 +39,14 @@ type DisplayMode = DisplayNameType | "recordDefault";
 
 type ActressesPageProps = {
   focusActressId?: string | null;
+  backLabel?: string;
   onBackToLibrary?: () => void;
   onOpenDetail?: (actressId: string) => void;
 };
 
 export function ActressesPage({
   focusActressId = null,
+  backLabel = "返回女优库",
   onBackToLibrary,
   onOpenDetail,
 }: ActressesPageProps) {
@@ -259,7 +261,7 @@ export function ActressesPage({
               onClick={onBackToLibrary}
               className="w-fit rounded-full border border-[var(--color-border)] bg-[var(--color-surface-soft)] px-4 py-2 text-sm text-[var(--color-muted)] transition hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text)]"
             >
-              ← 返回女优库
+              ← {backLabel}
             </button>
             {detailActress ? (
               <ActressDetailForm

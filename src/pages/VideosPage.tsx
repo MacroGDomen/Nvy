@@ -39,12 +39,14 @@ type SaveStatus = "idle" | "saving" | "saved" | "error";
 
 type VideosPageProps = {
   focusVideoId?: string | null;
+  backLabel?: string;
   onBackToLibrary?: () => void;
   onOpenDetail?: (videoId: string) => void;
 };
 
 export function VideosPage({
   focusVideoId = null,
+  backLabel = "返回影片库",
   onBackToLibrary,
   onOpenDetail,
 }: VideosPageProps) {
@@ -233,7 +235,7 @@ export function VideosPage({
               onClick={onBackToLibrary}
               className="w-fit rounded-full border border-[var(--color-border)] bg-[var(--color-surface-soft)] px-4 py-2 text-sm text-[var(--color-muted)] transition hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text)]"
             >
-              ← 返回影片库
+              ← {backLabel}
             </button>
             {detailVideo ? (
               <VideoDetailForm

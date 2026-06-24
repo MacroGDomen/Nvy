@@ -15,10 +15,17 @@ import { Button } from "../components/ui/Button";
 import { useToast } from "../components/ui/Toast";
 
 type HomePageProps = {
-  onOpenDetail: (target: { route: "actresses"; id: string } | { route: "videos"; id: string }) => void;
+  onOpenDetail: (
+    target:
+      | { route: "actresses"; id: string; returnRoute: "home" }
+      | { route: "videos"; id: string; returnRoute: "home" },
+  ) => void;
 };
 
 type ImageMap = Record<string, string>;
+const HOME_VIDEO_CAROUSEL_CENTER_X = "59%";
+const HOME_ACTRESS_CAROUSEL_CENTER_X = "54%";
+
 type CarouselItem<T> = {
   item: T;
   key: string;
@@ -127,7 +134,7 @@ export function HomePage({ onOpenDetail }: HomePageProps) {
 
     const timer = window.setInterval(() => {
       setActressOffset((currentOffset) => currentOffset - 1);
-    }, 1000);
+    }, 3000);
 
     return () => window.clearInterval(timer);
   }, [actresses.length]);
@@ -139,7 +146,7 @@ export function HomePage({ onOpenDetail }: HomePageProps) {
 
     const timer = window.setInterval(() => {
       setVideoOffset((currentOffset) => currentOffset - 1);
-    }, 1000);
+    }, 3000);
 
     return () => window.clearInterval(timer);
   }, [videos.length]);
@@ -190,12 +197,16 @@ export function HomePage({ onOpenDetail }: HomePageProps) {
           <HomeActressCarousel
             actresses={visibleActresses}
             imageUrls={actressImages}
-            onOpen={(actressId) => onOpenDetail({ route: "actresses", id: actressId })}
+            onOpen={(actressId) =>
+              onOpenDetail({ route: "actresses", id: actressId, returnRoute: "home" })
+            }
           />
           <HomeVideoCarousel
             videos={visibleVideos}
             imageUrls={videoImages}
-            onOpen={(videoId) => onOpenDetail({ route: "videos", id: videoId })}
+            onOpen={(videoId) =>
+              onOpenDetail({ route: "videos", id: videoId, returnRoute: "home" })
+            }
           />
         </div>
 
@@ -225,16 +236,17 @@ function HomeActressCarousel({
   imageUrls: ImageMap;
   onOpen: (actressId: string) => void;
 }) {
+  const centerX = HOME_ACTRESS_CAROUSEL_CENTER_X;
   const arc = [
-    { x: "-8%", y: "27%", scale: 0.42, opacity: 0, zIndex: 1 },
-    { x: "7%", y: "20%", scale: 0.58, opacity: 0.36, zIndex: 2 },
-    { x: "22%", y: "11%", scale: 0.74, opacity: 0.58, zIndex: 3 },
-    { x: "39%", y: "5%", scale: 0.9, opacity: 0.78, zIndex: 4 },
-    { x: "56%", y: "0%", scale: 1.18, opacity: 1, zIndex: 6 },
-    { x: "73%", y: "5%", scale: 0.9, opacity: 0.78, zIndex: 4 },
-    { x: "90%", y: "11%", scale: 0.74, opacity: 0.58, zIndex: 3 },
-    { x: "105%", y: "20%", scale: 0.58, opacity: 0.32, zIndex: 2 },
-    { x: "119%", y: "27%", scale: 0.42, opacity: 0, zIndex: 1 },
+    { x: "-10%", y: "27%", scale: 0.42, opacity: 0, zIndex: 1 },
+    { x: "5%", y: "20%", scale: 0.58, opacity: 0.36, zIndex: 2 },
+    { x: "20%", y: "11%", scale: 0.74, opacity: 0.58, zIndex: 3 },
+    { x: "37%", y: "5%", scale: 0.9, opacity: 0.78, zIndex: 4 },
+    { x: centerX, y: "0%", scale: 1.18, opacity: 1, zIndex: 6 },
+    { x: "71%", y: "5%", scale: 0.9, opacity: 0.78, zIndex: 4 },
+    { x: "88%", y: "11%", scale: 0.74, opacity: 0.58, zIndex: 3 },
+    { x: "103%", y: "20%", scale: 0.58, opacity: 0.32, zIndex: 2 },
+    { x: "117%", y: "27%", scale: 0.42, opacity: 0, zIndex: 1 },
   ];
 
   return (
@@ -295,14 +307,15 @@ function HomeVideoCarousel({
   imageUrls: ImageMap;
   onOpen: (videoId: string) => void;
 }) {
+  const centerX = HOME_VIDEO_CAROUSEL_CENTER_X;
   const arc = [
-    { x: "0%", y: "58%", scale: 0.5, opacity: 0, zIndex: 1 },
-    { x: "18%", y: "49%", scale: 0.72, opacity: 0.55, zIndex: 2 },
-    { x: "37%", y: "39%", scale: 0.9, opacity: 0.78, zIndex: 4 },
-    { x: "56%", y: "31%", scale: 1.2, opacity: 1, zIndex: 7 },
-    { x: "75%", y: "39%", scale: 0.9, opacity: 0.78, zIndex: 3 },
-    { x: "94%", y: "49%", scale: 0.72, opacity: 0.55, zIndex: 2 },
-    { x: "112%", y: "58%", scale: 0.5, opacity: 0, zIndex: 1 },
+    { x: "3%", y: "58%", scale: 0.5, opacity: 0, zIndex: 1 },
+    { x: "21%", y: "49%", scale: 0.72, opacity: 0.55, zIndex: 2 },
+    { x: "40%", y: "39%", scale: 0.9, opacity: 0.78, zIndex: 4 },
+    { x: centerX, y: "31%", scale: 1.2, opacity: 1, zIndex: 7 },
+    { x: "78%", y: "39%", scale: 0.9, opacity: 0.78, zIndex: 3 },
+    { x: "97%", y: "49%", scale: 0.72, opacity: 0.55, zIndex: 2 },
+    { x: "115%", y: "58%", scale: 0.5, opacity: 0, zIndex: 1 },
   ];
 
   return (
