@@ -31,12 +31,17 @@ export function App() {
   }
 
   function handleRouteChange(route: ProtectedRoute) {
+    setDetailTarget(null);
     setRequestedRoute(route);
   }
 
   function handleOpenDetail(target: DetailTarget) {
     setDetailTarget(target);
     setRequestedRoute(target.route);
+  }
+
+  function handleBackToLibrary() {
+    setDetailTarget(null);
   }
 
   if (currentRoute === "auth" || !session) {
@@ -54,7 +59,7 @@ export function App() {
       <RouteContent
         route={activeRoute}
         detailTarget={detailTarget}
-        onDetailTargetConsumed={() => setDetailTarget(null)}
+        onBackToLibrary={handleBackToLibrary}
         onOpenDetail={handleOpenDetail}
       />
     </AppShell>
@@ -64,14 +69,14 @@ export function App() {
 type RouteContentProps = {
   route: ProtectedRoute;
   detailTarget: DetailTarget | null;
-  onDetailTargetConsumed: () => void;
+  onBackToLibrary: () => void;
   onOpenDetail: (target: DetailTarget) => void;
 };
 
 function RouteContent({
   route,
   detailTarget,
-  onDetailTargetConsumed,
+  onBackToLibrary,
   onOpenDetail,
 }: RouteContentProps) {
   switch (route) {
@@ -79,14 +84,16 @@ function RouteContent({
       return (
         <ActressesPage
           focusActressId={detailTarget?.route === "actresses" ? detailTarget.id : null}
-          onFocusConsumed={onDetailTargetConsumed}
+          onBackToLibrary={onBackToLibrary}
+          onOpenDetail={(id) => onOpenDetail({ route: "actresses", id })}
         />
       );
     case "videos":
       return (
         <VideosPage
           focusVideoId={detailTarget?.route === "videos" ? detailTarget.id : null}
-          onFocusConsumed={onDetailTargetConsumed}
+          onBackToLibrary={onBackToLibrary}
+          onOpenDetail={(id) => onOpenDetail({ route: "videos", id })}
         />
       );
     case "settings":

@@ -42,8 +42,8 @@ export function Sidebar({ username, activeRoute, onSelect }: SidebarProps) {
   return (
     <aside
       className={cn(
-        "flex h-screen flex-col gap-4 border-r border-[var(--color-border)] bg-[var(--color-surface)]/92 px-2 py-4 backdrop-blur transition-[width] duration-200 ease-out",
-        expanded ? "w-56" : "w-16",
+        "nvy-sidebar group/sidebar flex flex-col gap-4 border-r border-[var(--color-border)] bg-[rgba(22,21,27,0.92)] px-2 py-4 backdrop-blur-xl transition-[width] duration-200 ease-out",
+        expanded ? "w-56 shadow-[var(--shadow-panel)]" : "w-16",
       )}
       aria-label="Primary navigation"
     >
@@ -93,13 +93,13 @@ function SidebarLogo({ expanded, onClick }: SidebarLogoProps) {
         aria-label={tooltipLabel}
         aria-expanded={expanded}
         className={cn(
-          "group flex items-center gap-3 rounded-2xl border border-transparent px-2 py-2 text-left transition",
+          "group flex h-10 items-center gap-3 rounded-2xl border border-transparent px-2 text-left transition",
           "hover:border-[var(--color-border)] hover:bg-[var(--color-surface-hover)]",
           "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-focus)]",
           expanded ? "w-full" : "justify-center",
         )}
       >
-        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-[linear-gradient(135deg,var(--color-accent),var(--color-accent-pink))] text-sm font-extrabold tracking-normal text-[var(--color-accent-foreground)] shadow-[var(--shadow-glow)]">
+        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-[linear-gradient(135deg,var(--color-accent),var(--color-accent-pink))] text-[10px] font-extrabold tracking-normal text-[var(--color-accent-foreground)] shadow-[var(--shadow-glow)]">
           NVY
         </span>
         {expanded ? (
@@ -134,7 +134,7 @@ function SidebarButton({
       aria-current={isActive ? "page" : undefined}
       onClick={() => onSelect(item.id)}
       className={cn(
-        "flex items-center gap-3 rounded-2xl px-2 py-2 text-sm font-medium tracking-normal transition",
+        "flex h-10 items-center gap-3 rounded-2xl px-2 text-sm font-medium tracking-normal transition",
         "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-focus)]",
         expanded ? "w-full" : "justify-center",
         isActive
@@ -166,7 +166,7 @@ function SidebarAccount({ expanded, username }: SidebarAccountProps) {
     return (
       <Tooltip label={username}>
         <div className="mt-1 flex justify-center">
-          <span className="grid h-8 w-8 place-items-center rounded-full bg-[var(--color-surface-strong)] text-xs font-semibold text-[var(--color-accent-soft)]">
+          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[var(--color-surface-strong)] text-xs font-semibold text-[var(--color-accent-soft)]">
             {initial}
           </span>
         </div>
@@ -175,7 +175,7 @@ function SidebarAccount({ expanded, username }: SidebarAccountProps) {
   }
 
   return (
-    <div className="mt-1 flex items-center gap-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface-soft)] px-2 py-2">
+    <div className="mt-1 flex h-10 items-center gap-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface-soft)] px-2">
       <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[var(--color-surface-strong)] text-xs font-semibold text-[var(--color-accent-soft)]">
         {initial}
       </span>

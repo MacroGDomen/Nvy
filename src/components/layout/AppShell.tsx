@@ -10,8 +10,6 @@ type AppShellProps = {
   children: ReactNode;
 };
 
-// AppShell is the shared layout for authenticated pages. It places the global
-// collapsible sidebar on the left and the active page content on the right.
 export function AppShell({
   session,
   activeRoute,
@@ -19,13 +17,15 @@ export function AppShell({
   children,
 }: AppShellProps) {
   return (
-    <div className="flex min-h-screen">
-      <Sidebar
-        username={session.username}
-        activeRoute={activeRoute}
-        onSelect={onRouteChange}
-      />
-      <div className="min-w-0 flex-1">{children}</div>
+    <div className="nvy-viewport">
+      <div className="nvy-stage">
+        <Sidebar
+          username={session.username}
+          activeRoute={activeRoute}
+          onSelect={onRouteChange}
+        />
+        <div className="nvy-page">{children}</div>
+      </div>
     </div>
   );
 }

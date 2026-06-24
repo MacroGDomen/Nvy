@@ -169,53 +169,44 @@ export function HomePage({ onOpenDetail }: HomePageProps) {
     [actresses, actressOffset],
   );
   const visibleVideos = useMemo(
-    () => rotateItems(videos, videoOffset, 6),
+    () => rotateItems(videos, videoOffset, 5),
     [videos, videoOffset],
   );
 
   return (
-    <main className="min-h-screen bg-[var(--color-background)] px-6 py-7 text-[var(--color-text)] lg:px-8">
-      <section className="mx-auto grid max-w-7xl gap-6">
-        <header className="flex flex-wrap items-end justify-between gap-4 border-b border-[var(--color-border)] pb-5">
-          <div>
-            <p className="mb-2 text-sm font-medium tracking-normal text-[var(--color-accent-soft)]">
-              Home
-            </p>
-            <h1 className="text-3xl font-semibold tracking-normal text-[var(--color-text-strong)]">
-              首页
-            </h1>
-          </div>
-          <p className="text-sm text-[var(--color-muted)]">
-            {isLoadingLibrary
-              ? "加载中"
-              : `${videos.length} 部影片 / ${actresses.length} 位女优`}
-          </p>
-        </header>
-
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_390px]">
-          <section className="grid gap-6">
-            <HomeActressCarousel
-              actresses={visibleActresses}
-              imageUrls={actressImages}
-              onOpen={(actressId) => onOpenDetail({ route: "actresses", id: actressId })}
-            />
-            <HomeVideoCarousel
-              videos={visibleVideos}
-              imageUrls={videoImages}
-              onOpen={(videoId) => onOpenDetail({ route: "videos", id: videoId })}
-            />
-          </section>
-
-          <section className="grid content-start gap-5">
-            <HomeRecommendationBox
-              preference={preference}
-              isSubmitting={isSubmitting}
-              onPreferenceChange={setPreference}
-              onSubmit={handleSubmit}
-            />
-            {payload ? <RecommendationPreview payload={payload} /> : null}
-          </section>
+    <main className="relative h-full overflow-hidden bg-[#101014] text-[var(--color-text)]">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_54%_55%,rgba(71,84,157,0.28),transparent_31%),radial-gradient(circle_at_75%_22%,rgba(202,139,183,0.12),transparent_24%)]" />
+      <section className="relative grid h-full grid-rows-[minmax(0,1fr)_15.5rem] px-14 pb-8 pt-9">
+        <div className="relative min-h-0">
+          {isLoadingLibrary ? (
+            <div className="absolute right-0 top-0 text-xs text-[var(--color-muted)]">
+              加载资料中
+            </div>
+          ) : null}
+          <HomeActressCarousel
+            actresses={visibleActresses}
+            imageUrls={actressImages}
+            onOpen={(actressId) => onOpenDetail({ route: "actresses", id: actressId })}
+          />
+          <HomeVideoCarousel
+            videos={visibleVideos}
+            imageUrls={videoImages}
+            onOpen={(videoId) => onOpenDetail({ route: "videos", id: videoId })}
+          />
         </div>
+
+        <section className="grid content-end justify-items-center gap-5">
+          <p className="text-center text-3xl font-medium tracking-normal text-[rgba(245,240,250,0.84)]">
+            你好，今天你想从谁开始？
+          </p>
+          <HomeRecommendationBox
+            preference={preference}
+            isSubmitting={isSubmitting}
+            onPreferenceChange={setPreference}
+            onSubmit={handleSubmit}
+          />
+          {payload ? <RecommendationPreview payload={payload} /> : null}
+        </section>
       </section>
     </main>
   );
@@ -230,33 +221,41 @@ function HomeActressCarousel({
   imageUrls: ImageMap;
   onOpen: (actressId: string) => void;
 }) {
+  const arc = [
+    { x: "2%", y: "19%", scale: 0.58, opacity: 0.36 },
+    { x: "15%", y: "10%", scale: 0.74, opacity: 0.58 },
+    { x: "30%", y: "4%", scale: 0.9, opacity: 0.78 },
+    { x: "46%", y: "0%", scale: 1.18, opacity: 1 },
+    { x: "63%", y: "4%", scale: 0.9, opacity: 0.78 },
+    { x: "78%", y: "10%", scale: 0.74, opacity: 0.58 },
+    { x: "91%", y: "19%", scale: 0.58, opacity: 0.36 },
+  ];
+
   return (
-    <section className="grid gap-4">
-      <SectionHeader title="女优轮播" subtitle="点击头像进入详情" />
+    <section className="absolute inset-x-0 top-0 h-[18.5rem]">
       {actresses.length === 0 ? (
-        <EmptyPanel text="还没有女优记录" />
+        <EmptyPanel className="mx-auto mt-14 w-80" text="还没有女优记录" />
       ) : (
-        <div className="grid grid-cols-3 items-center gap-3 overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface-soft)] p-4 md:grid-cols-5 xl:grid-cols-7">
+        <div className="relative h-full">
           {actresses.map((actress, index) => {
-            const isCenter = index === Math.floor(actresses.length / 2);
+            const position = arc[index] ?? arc[0];
+            const displayName = actress.simplifiedChineseName || actress.name;
 
             return (
               <button
                 key={actress.id}
                 type="button"
                 onClick={() => onOpen(actress.id)}
-                className={[
-                  "grid min-w-0 place-items-center gap-3 rounded-2xl border px-3 py-4 text-center transition hover:border-[var(--color-border-strong)] hover:bg-[var(--color-surface-hover)]",
-                  isCenter
-                    ? "border-[var(--color-accent)] bg-[rgba(165,140,223,0.16)]"
-                    : "border-transparent bg-transparent opacity-78",
-                ].join(" ")}
+                className="absolute grid -translate-x-1/2 place-items-center gap-2 text-center transition duration-500 hover:opacity-100"
+                style={{
+                  left: position.x,
+                  top: position.y,
+                  opacity: position.opacity,
+                  transform: `translateX(-50%) scale(${position.scale})`,
+                }}
               >
                 <span
-                  className={[
-                    "grid place-items-center overflow-hidden rounded-full border border-[var(--color-border)] bg-[var(--color-input)] text-lg font-semibold text-[var(--color-accent-soft)] transition",
-                    isCenter ? "h-28 w-28" : "h-20 w-20",
-                  ].join(" ")}
+                  className="grid h-28 w-28 place-items-center overflow-hidden rounded-full border border-[rgba(255,255,255,0.12)] bg-[var(--color-input)] text-2xl font-semibold text-[var(--color-accent-soft)] shadow-[0_18px_48px_rgba(0,0,0,0.36)]"
                 >
                   {imageUrls[actress.id] ? (
                     <img
@@ -268,8 +267,8 @@ function HomeActressCarousel({
                     actress.name.trim().slice(0, 1) || "?"
                   )}
                 </span>
-                <span className="w-full truncate text-sm font-semibold text-[var(--color-text-strong)]">
-                  {actress.simplifiedChineseName || actress.name}
+                <span className="w-32 truncate text-sm font-medium text-[rgba(245,240,250,0.86)]">
+                  {displayName}
                 </span>
               </button>
             );
@@ -289,29 +288,38 @@ function HomeVideoCarousel({
   imageUrls: ImageMap;
   onOpen: (videoId: string) => void;
 }) {
+  const arc = [
+    { x: "14%", y: "48%", scale: 0.72, opacity: 0.55 },
+    { x: "31%", y: "38%", scale: 0.9, opacity: 0.78 },
+    { x: "50%", y: "31%", scale: 1.2, opacity: 1 },
+    { x: "69%", y: "38%", scale: 0.9, opacity: 0.78 },
+    { x: "86%", y: "48%", scale: 0.72, opacity: 0.55 },
+  ];
+
   return (
-    <section className="grid gap-4">
-      <SectionHeader title="影片轮播" subtitle="点击封面进入详情" />
+    <section className="absolute inset-x-0 top-20 h-[24rem]">
       {videos.length === 0 ? (
-        <EmptyPanel text="还没有影片记录" />
+        <EmptyPanel className="mx-auto mt-32 w-96" text="还没有影片记录" />
       ) : (
-        <div className="grid grid-cols-2 gap-3 overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface-soft)] p-4 md:grid-cols-3 xl:grid-cols-6">
+        <div className="relative h-full">
           {videos.map((video, index) => {
-            const isCenter = index === Math.floor(videos.length / 2);
+            const position = arc[index] ?? arc[0];
+            const title = `${video.code} ${video.title || ""}`.trim();
 
             return (
               <button
                 key={video.id}
                 type="button"
                 onClick={() => onOpen(video.id)}
-                className={[
-                  "grid min-w-0 gap-3 rounded-2xl border p-3 text-left transition hover:border-[var(--color-border-strong)] hover:bg-[var(--color-surface-hover)]",
-                  isCenter
-                    ? "border-[var(--color-accent)] bg-[rgba(165,140,223,0.14)]"
-                    : "border-transparent bg-transparent",
-                ].join(" ")}
+                className="absolute grid -translate-x-1/2 gap-2 text-left transition duration-500 hover:opacity-100"
+                style={{
+                  left: position.x,
+                  top: position.y,
+                  opacity: position.opacity,
+                  transform: `translateX(-50%) scale(${position.scale})`,
+                }}
               >
-                <span className="grid aspect-[3/4] w-full place-items-center overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-input)] text-sm font-semibold text-[var(--color-accent-soft)]">
+                <span className="grid h-36 w-56 place-items-center overflow-hidden rounded-[1.25rem] border border-[rgba(255,255,255,0.12)] bg-[var(--color-input)] text-sm font-semibold text-[var(--color-accent-soft)] shadow-[0_18px_56px_rgba(0,0,0,0.44)]">
                   {imageUrls[video.id] ? (
                     <img
                       src={imageUrls[video.id]}
@@ -322,10 +330,9 @@ function HomeVideoCarousel({
                     video.code
                   )}
                 </span>
-                <span className="line-clamp-2 min-h-10 text-sm font-semibold leading-5 text-[var(--color-text-strong)]">
-                  {video.title || video.code}
+                <span className="nvy-line-clamp-2 w-56 text-sm font-medium leading-5 text-[rgba(245,240,250,0.86)]">
+                  {title}
                 </span>
-                <span className="truncate text-xs text-[var(--color-muted)]">{video.code}</span>
               </button>
             );
           })}
@@ -347,119 +354,39 @@ function HomeRecommendationBox({
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }) {
   return (
-    <section className="grid gap-4 rounded-2xl border border-[var(--color-border)] bg-[var(--color-panel)] p-5 shadow-[var(--shadow-panel)]">
-      <div>
-        <h2 className="text-xl font-semibold text-[var(--color-text-strong)]">首页推荐</h2>
-        <p className="mt-1 text-sm text-[var(--color-muted)]">
-          输入偏好后会从本地资料库构造候选；不会发送密码、API Key 或本地绝对路径。
-        </p>
-      </div>
-
-      <form onSubmit={onSubmit} className="grid gap-3">
+      <form
+        onSubmit={onSubmit}
+        className="grid w-[min(61rem,78vw)] gap-3 rounded-[1.45rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(35,35,38,0.94)] px-4 py-4 shadow-[0_28px_80px_rgba(0,0,0,0.38)]"
+      >
         <textarea
           value={preference}
           onChange={(event) => onPreferenceChange(event.target.value)}
-          rows={8}
+          rows={3}
           placeholder="写下今天想看的偏好、关键词或排除条件"
-          className="min-h-48 resize-y rounded-2xl border border-[var(--color-border)] bg-[var(--color-input)] px-4 py-4 text-[var(--color-text)] outline-none transition placeholder:text-[var(--color-muted-subtle)] focus:border-[var(--color-focus)] focus:ring-2 focus:ring-[var(--color-focus-soft)]"
+          className="min-h-20 resize-none rounded-2xl border-0 bg-transparent px-1 py-1 text-[var(--color-text)] outline-none placeholder:text-[var(--color-muted-subtle)]"
         />
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <span className="text-xs text-[var(--color-muted)]">真实请求等待 HTTP 客户端接入</span>
-          <Button type="submit" disabled={isSubmitting}>
-            构造推荐候选
+          <span className="text-xs text-[var(--color-muted)]">本地候选 + 首页推荐</span>
+          <Button type="submit" disabled={isSubmitting} className="h-9 px-4">
+            发送
           </Button>
         </div>
       </form>
-    </section>
   );
 }
 
 function RecommendationPreview({ payload }: { payload: RecommendationPayload }) {
   return (
-    <section className="grid gap-4 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface-soft)] p-5">
-      <div>
-        <h2 className="text-lg font-semibold text-[var(--color-text-strong)]">候选预览</h2>
-        <p className="mt-1 text-sm text-[var(--color-muted)]">
-          当前参考上限：{payload.referenceLimit === 0 ? "不限" : payload.referenceLimit}
-          ，候选合计 {payload.videos.length + payload.actresses.length} 条。
-        </p>
-      </div>
-
-      <div className="grid gap-4">
-        <CandidateList
-          title="影片候选"
-          emptyText="暂无影片候选"
-          items={payload.videos.map((video) => ({
-            id: video.id,
-            title: video.title || video.code,
-            description: [video.code, video.actorNames, video.workType]
-              .filter(Boolean)
-              .join(" / "),
-          }))}
-        />
-        <CandidateList
-          title="女优候选"
-          emptyText="暂无女优候选"
-          items={payload.actresses.map((actress) => ({
-            id: actress.id,
-            title: actress.simplifiedChineseName || actress.name,
-            description: [actress.japaneseName, actress.romanizedName, actress.cupSize]
-              .filter(Boolean)
-              .join(" / "),
-          }))}
-        />
-      </div>
+    <section className="max-w-[52rem] text-center text-xs text-[var(--color-muted)]">
+      当前参考上限：{payload.referenceLimit === 0 ? "不限" : payload.referenceLimit}
+      ，候选合计 {payload.videos.length + payload.actresses.length} 条。
     </section>
   );
 }
 
-function CandidateList({
-  title,
-  emptyText,
-  items,
-}: {
-  title: string;
-  emptyText: string;
-  items: Array<{ id: string; title: string; description: string }>;
-}) {
+function EmptyPanel({ text, className }: { text: string; className?: string }) {
   return (
-    <div className="grid content-start gap-2">
-      <h3 className="text-sm font-semibold text-[var(--color-text-strong)]">{title}</h3>
-      {items.length === 0 ? (
-        <p className="rounded-2xl border border-dashed border-[var(--color-border)] px-4 py-5 text-sm text-[var(--color-muted)]">
-          {emptyText}
-        </p>
-      ) : (
-        items.slice(0, 5).map((item) => (
-          <div
-            key={item.id}
-            className="rounded-xl border border-[var(--color-border)] bg-[var(--color-input)] px-4 py-3"
-          >
-            <p className="truncate text-sm font-semibold text-[var(--color-text-strong)]">
-              {item.title}
-            </p>
-            <p className="mt-1 truncate text-xs text-[var(--color-muted)]">
-              {item.description || "无补充字段"}
-            </p>
-          </div>
-        ))
-      )}
-    </div>
-  );
-}
-
-function SectionHeader({ title, subtitle }: { title: string; subtitle: string }) {
-  return (
-    <div className="flex items-end justify-between gap-3">
-      <h2 className="text-xl font-semibold text-[var(--color-text-strong)]">{title}</h2>
-      <span className="text-xs text-[var(--color-muted)]">{subtitle}</span>
-    </div>
-  );
-}
-
-function EmptyPanel({ text }: { text: string }) {
-  return (
-    <div className="rounded-2xl border border-dashed border-[var(--color-border)] bg-[var(--color-surface-soft)] px-4 py-12 text-center text-sm text-[var(--color-muted)]">
+    <div className={`rounded-2xl border border-dashed border-[var(--color-border)] bg-[var(--color-surface-soft)] px-4 py-10 text-center text-sm text-[var(--color-muted)] ${className ?? ""}`}>
       {text}
     </div>
   );

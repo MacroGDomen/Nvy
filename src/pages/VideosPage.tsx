@@ -39,12 +39,14 @@ type SaveStatus = "idle" | "saving" | "saved" | "error";
 
 type VideosPageProps = {
   focusVideoId?: string | null;
-  onFocusConsumed?: () => void;
+  onBackToLibrary?: () => void;
+  onOpenDetail?: (videoId: string) => void;
 };
 
 export function VideosPage({
   focusVideoId = null,
-  onFocusConsumed,
+  onBackToLibrary,
+  onOpenDetail,
 }: VideosPageProps) {
   const [videos, setVideos] = useState<VideoRecord[]>([]);
   const [selectedVideo, setSelectedVideo] = useState<VideoRecord | null>(null);
@@ -93,9 +95,6 @@ export function VideosPage({
             nextVideos[0] ??
             null,
         );
-        if (focusVideoId) {
-          onFocusConsumed?.();
-        }
       })
       .catch(() => {
         if (isActive) {
@@ -115,7 +114,7 @@ export function VideosPage({
     return () => {
       isActive = false;
     };
-  }, [focusVideoId, notify, onFocusConsumed]);
+  }, [focusVideoId, notify]);
 
   useEffect(() => {
     if (!focusVideoId || videos.length === 0) {
@@ -125,9 +124,8 @@ export function VideosPage({
     const focusedVideo = videos.find((video) => video.id === focusVideoId);
     if (focusedVideo) {
       setSelectedVideo(focusedVideo);
-      onFocusConsumed?.();
     }
-  }, [focusVideoId, onFocusConsumed, videos]);
+  }, [focusVideoId, videos]);
 
   useEffect(() => {
     let isActive = true;
@@ -196,6 +194,7 @@ export function VideosPage({
       setSelectedVideo(nextVideos[0] ?? null);
       return nextVideos;
     });
+    onBackToLibrary?.();
   }
 
   function handleVideoTagsChanged(videoId: string, tags: TagRecord[]) {
@@ -220,64 +219,91 @@ export function VideosPage({
     actressesByVideoId: videoActressesById,
   });
 
-  return (
-    <main className="min-h-screen bg-[var(--color-background)] px-6 py-7 text-[var(--color-text)] lg:px-8">
-      <section className="mx-auto grid max-w-7xl gap-6">
-        <header className="flex flex-wrap items-end justify-between gap-4 border-b border-[var(--color-border)] pb-5">
-          <div>
-            <p className="mb-2 text-sm font-medium tracking-normal text-[var(--color-accent-soft)]">
-              Library
-            </p>
-            <h1 className="text-3xl font-semibold tracking-normal text-[var(--color-text-strong)]">
-              影片库
-            </h1>
-          </div>
-          <p className="text-sm text-[var(--color-muted)]">
-            {isLoading ? "加载中" : `${videos.length} 条影片`}
-          </p>
-        </header>
+  const detailVideo = focusVideoId
+    ? videos.find((video) => video.id === focusVideoId) ?? selectedVideo
+    : null;
 
-        <form
-          onSubmit={handleCreateVideo}
-          className="grid gap-3 border-b border-[var(--color-border)] pb-6 md:grid-cols-[1fr_1.4fr_180px_auto]"
-        >
-          <Input
-            name="code"
-            label="番号"
-            placeholder="例如 ABC-001"
-            value={code}
-            onChange={(event) => setCode(event.target.value)}
-          />
-          <Input
-            name="title"
-            label="标题"
-            placeholder="可稍后补充"
-            value={title}
-            onChange={(event) => setTitle(event.target.value)}
-          />
-          <WorkTypeSelect value={workType} onChange={setWorkType} />
-          <div className="flex items-end">
-            <Button type="submit" disabled={isSubmitting}>
-              添加
+  if (focusVideoId) {
+    return (
+      <main className="h-full bg-[#101014] text-[var(--color-text)]">
+        <section className="nvy-page-scroll px-10 py-8">
+          <div className="mx-auto grid max-w-[76rem] gap-5">
+            <button
+              type="button"
+              onClick={onBackToLibrary}
+              className="w-fit rounded-full border border-[var(--color-border)] bg-[var(--color-surface-soft)] px-4 py-2 text-sm text-[var(--color-muted)] transition hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text)]"
+            >
+              ← 返回影片库
+            </button>
+            {detailVideo ? (
+              <VideoDetailForm
+                key={detailVideo.id}
+                video={detailVideo}
+                onSaved={handleVideoSaved}
+                onDeleted={handleVideoDeleted}
+                onTagsChanged={handleVideoTagsChanged}
+                onActressesChanged={handleVideoActressesChanged}
+              />
+            ) : (
+              <EmptyState text={isLoading ? "正在加载影片详情" : "没有找到这部影片"} />
+            )}
+          </div>
+        </section>
+      </main>
+    );
+  }
+
+  return (
+    <main className="h-full bg-[#101014] text-[var(--color-text)]">
+      <section className="grid h-full grid-rows-[auto_auto_minmax(0,1fr)] px-10 py-7">
+        <section className="grid gap-3">
+          <div className="grid grid-cols-[minmax(0,1fr)_auto_auto_auto_auto] items-center gap-2">
+            <Input
+              name="video-search"
+              aria-label="搜索影片"
+              placeholder="搜索框"
+              value={searchText}
+              onChange={(event) => setSearchText(event.target.value)}
+              className="h-14 rounded-[1.35rem] border-[rgba(255,255,255,0.08)] bg-[rgba(39,39,43,0.96)] px-5 text-base"
+            />
+            <Button type="button" className="h-14 rounded-[1.2rem] px-6">
+              搜索
+            </Button>
+            <WorkTypeFilterSelect value={workTypeFilter} onChange={setWorkTypeFilter} />
+            <SortModeSelect value={sortMode} onChange={setSortMode} />
+            <Button type="submit" form="video-create-form" disabled={isSubmitting} className="h-14 rounded-[1.2rem] px-6">
+              新增
             </Button>
           </div>
-        </form>
-
-        <section className="sticky top-0 z-20 grid gap-3 border-b border-[var(--color-border)] bg-[linear-gradient(180deg,var(--color-background)_0%,rgba(17,17,20,0.94)_100%)] py-4 backdrop-blur-xl md:grid-cols-[1.4fr_180px_180px]">
-          <Input
-            name="video-search"
-            label="搜索"
-            placeholder="关键词 + #标签 + #[22-33]"
-            value={searchText}
-            onChange={(event) => setSearchText(event.target.value)}
-          />
-          <WorkTypeFilterSelect value={workTypeFilter} onChange={setWorkTypeFilter} />
-          <SortModeSelect value={sortMode} onChange={setSortMode} />
+          <form
+            id="video-create-form"
+            onSubmit={handleCreateVideo}
+            className="grid grid-cols-[1fr_1.4fr_12rem] gap-3 rounded-[1.35rem] border border-[var(--color-border)] bg-[rgba(28,27,33,0.7)] p-3"
+          >
+            <Input
+              name="code"
+              aria-label="番号"
+              placeholder="番号，例如 ABC-001"
+              value={code}
+              onChange={(event) => setCode(event.target.value)}
+            />
+            <Input
+              name="title"
+              aria-label="标题"
+              placeholder="标题，可稍后补充"
+              value={title}
+              onChange={(event) => setTitle(event.target.value)}
+            />
+            <WorkTypeSelect value={workType} onChange={setWorkType} />
+          </form>
         </section>
 
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,0.95fr)_minmax(420px,1.05fr)]">
-          <section className="relative grid max-h-[calc(100vh-220px)] content-start gap-3 overflow-y-auto pr-1 sm:grid-cols-2 xl:grid-cols-3">
-            <div className="pointer-events-none sticky top-0 z-10 col-span-full h-6 bg-gradient-to-b from-[var(--color-background)] to-transparent" />
+        <p className="py-3 text-right text-xs text-[var(--color-muted)]">
+          {isLoading ? "加载中" : `${videos.length} 条影片`}
+        </p>
+
+        <section className="nvy-page-scroll nvy-fade-top pr-1">
+          <div className="grid grid-cols-3 gap-x-20 gap-y-9 pb-8">
             {filteredVideos.length === 0 ? (
               <EmptyState text={isLoading ? "正在加载影片" : "还没有影片记录"} />
             ) : (
@@ -286,30 +312,12 @@ export function VideosPage({
                   key={video.id}
                   video={video}
                   coverUrl={coverUrlsById[video.id]}
-                  isSelected={selectedVideo?.id === video.id}
-                  onClick={() => setSelectedVideo(video)}
+                  onClick={() => onOpenDetail?.(video.id)}
                 />
               ))
             )}
-          </section>
-
-          <aside className="min-w-0 border-l border-[var(--color-border)] pl-6">
-            {selectedVideo ? (
-              <VideoDetailForm
-                key={selectedVideo.id}
-                video={selectedVideo}
-                onSaved={handleVideoSaved}
-                onDeleted={handleVideoDeleted}
-                onTagsChanged={handleVideoTagsChanged}
-                onActressesChanged={handleVideoActressesChanged}
-              />
-            ) : (
-              <p className="text-sm text-[var(--color-muted)]">
-                选择一条影片查看和编辑详情。
-              </p>
-            )}
-          </aside>
-        </div>
+          </div>
+        </section>
       </section>
     </main>
   );
@@ -724,7 +732,7 @@ function VideoDetailForm({
   return (
     <form
       onSubmit={handleSave}
-      className="sticky top-7 grid max-h-[calc(100vh-56px)] gap-4 overflow-y-auto rounded-2xl border border-[var(--color-border)] bg-[var(--color-panel)] p-5 shadow-[var(--shadow-panel)]"
+      className="grid gap-4 rounded-[1.6rem] border border-[var(--color-border)] bg-[rgba(28,27,34,0.78)] p-5 shadow-[var(--shadow-panel)]"
     >
       <div className="flex items-start justify-between gap-4">
         <div>
@@ -1054,34 +1062,27 @@ function VideoDetailForm({
 type VideoCardProps = {
   video: VideoRecord;
   coverUrl?: string;
-  isSelected: boolean;
   onClick: () => void;
 };
 
-function VideoCard({ video, coverUrl, isSelected, onClick }: VideoCardProps) {
+function VideoCard({ video, coverUrl, onClick }: VideoCardProps) {
+  const title = `${video.code} ${video.title || ""}`.trim();
+
   return (
     <button
       type="button"
       onClick={onClick}
-      className={[
-        "grid min-w-0 gap-3 rounded-2xl border p-3 text-left transition",
-        isSelected
-          ? "border-[var(--color-accent)] bg-[rgba(165,140,223,0.16)]"
-          : "border-[var(--color-border)] bg-[var(--color-surface-soft)] hover:border-[var(--color-border-strong)] hover:bg-[var(--color-surface-hover)]",
-      ].join(" ")}
+      className="grid min-w-0 gap-3 text-left transition hover:opacity-90"
     >
-      <span className="grid aspect-[3/4] w-full place-items-center overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-input)] text-sm font-semibold text-[var(--color-accent-soft)]">
+      <span className="grid aspect-[16/10] w-full place-items-center overflow-hidden rounded-[1.35rem] border border-[rgba(255,255,255,0.09)] bg-[var(--color-input)] text-sm font-semibold text-[var(--color-accent-soft)] shadow-[0_18px_44px_rgba(0,0,0,0.28)]">
         {coverUrl ? (
           <img src={coverUrl} alt="" className="h-full w-full object-cover" />
         ) : (
           video.code
         )}
       </span>
-      <span className="line-clamp-2 min-h-10 text-sm font-semibold leading-5 text-[var(--color-text-strong)]">
-        {video.title || video.code}
-      </span>
-      <span className="truncate text-xs text-[var(--color-muted)]">
-        {video.code} · {workTypeLabel[video.workType]}
+      <span className="nvy-line-clamp-2 min-h-10 text-sm font-medium leading-5 text-[var(--color-text-strong)]">
+        {title}
       </span>
     </button>
   );
@@ -1138,12 +1139,11 @@ function WorkTypeFilterSelect({
   const selectedOption = options.find((option) => option.value === value) ?? options[0];
 
   return (
-    <label className="grid gap-2 text-left text-sm text-[var(--color-muted)]">
-      <span>作品筛选</span>
+    <label className="grid text-left text-sm text-[var(--color-muted)]">
       <Dropdown
         label={selectedOption.label}
         align="end"
-        triggerClassName="h-11 w-full rounded-2xl"
+        triggerClassName="h-14 w-full rounded-[1.2rem]"
         items={options.map((option) => ({
           label: option.label,
           description: option.description,
@@ -1170,12 +1170,11 @@ function SortModeSelect({
   const selectedOption = options.find((option) => option.value === value) ?? options[0];
 
   return (
-    <label className="grid gap-2 text-left text-sm text-[var(--color-muted)]">
-      <span>排序</span>
+    <label className="grid text-left text-sm text-[var(--color-muted)]">
       <Dropdown
         label={selectedOption.label}
         align="end"
-        triggerClassName="h-11 w-full rounded-2xl"
+        triggerClassName="h-14 w-full rounded-[1.2rem]"
         items={options.map((option) => ({
           label: option.label,
           description: option.description,
@@ -1286,12 +1285,6 @@ function toVideoInput(draft: VideoDraft): VideoInput {
     review: draft.review,
   };
 }
-
-const workTypeLabel: Record<WorkType, string> = {
-  single: "单人作品",
-  multiple: "多人作品",
-  amateur: "素人作品",
-};
 
 function isImageEntry(
   entry: readonly [string, string] | null,

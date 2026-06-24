@@ -13,6 +13,8 @@ export function Tooltip({ label, children }: TooltipProps) {
         <TooltipPrimitive.Trigger asChild>{children}</TooltipPrimitive.Trigger>
         <TooltipPrimitive.Portal>
           <TooltipPrimitive.Content
+            side="right"
+            align="center"
             sideOffset={8}
             className="z-50 rounded-full border border-[var(--color-border)] bg-[var(--color-surface-strong)] px-3 py-2 text-xs text-[var(--color-text)] shadow-xl"
           >
@@ -24,4 +26,3 @@ export function Tooltip({ label, children }: TooltipProps) {
     </TooltipPrimitive.Provider>
   );
 }
-

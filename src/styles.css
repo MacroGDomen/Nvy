@@ -49,7 +49,11 @@ body {
   min-width: 320px;
   min-height: 100vh;
   margin: 0;
-  background: linear-gradient(180deg, #141318 0%, var(--color-background) 42%, #0f0f12 100%);
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 54% 48%, rgba(69, 83, 157, 0.28), transparent 29%),
+    radial-gradient(circle at 68% 72%, rgba(135, 77, 124, 0.18), transparent 32%),
+    linear-gradient(180deg, #141318 0%, var(--color-background) 42%, #0f0f12 100%);
 }
 
 button,
@@ -87,4 +91,70 @@ select {
 
 input[type="checkbox"] {
   accent-color: var(--color-accent);
+}
+
+#root {
+  min-height: 100vh;
+}
+
+.nvy-viewport {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  overflow: hidden;
+  padding: 0;
+}
+
+.nvy-stage {
+  position: relative;
+  width: min(100vw, calc(100vh * 16 / 9));
+  height: min(100vh, calc(100vw * 9 / 16));
+  min-width: 320px;
+  min-height: 180px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background:
+    radial-gradient(circle at 52% 44%, rgba(63, 77, 146, 0.2), transparent 34%),
+    radial-gradient(circle at 70% 18%, rgba(189, 139, 176, 0.08), transparent 24%),
+    #101014;
+  box-shadow: 0 30px 120px rgba(0, 0, 0, 0.5);
+  font-size: clamp(12px, min(0.833333vw, 1.481481vh), 16px);
+}
+
+.nvy-sidebar {
+  position: absolute;
+  inset: 0 auto 0 0;
+  z-index: 40;
+  height: 100%;
+}
+
+.nvy-page {
+  position: absolute;
+  inset: 0 0 0 4rem;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.nvy-page-scroll {
+  height: 100%;
+  overflow-y: auto;
+}
+
+.nvy-fade-top::before {
+  content: "";
+  pointer-events: none;
+  position: sticky;
+  top: 0;
+  z-index: 12;
+  display: block;
+  height: 2rem;
+  margin-bottom: -2rem;
+  background: linear-gradient(180deg, #101014 0%, rgba(16, 16, 20, 0));
+}
+
+.nvy-line-clamp-2 {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }

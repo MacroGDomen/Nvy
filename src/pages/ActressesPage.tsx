@@ -39,12 +39,14 @@ type DisplayMode = DisplayNameType | "recordDefault";
 
 type ActressesPageProps = {
   focusActressId?: string | null;
-  onFocusConsumed?: () => void;
+  onBackToLibrary?: () => void;
+  onOpenDetail?: (actressId: string) => void;
 };
 
 export function ActressesPage({
   focusActressId = null,
-  onFocusConsumed,
+  onBackToLibrary,
+  onOpenDetail,
 }: ActressesPageProps) {
   const [actresses, setActresses] = useState<ActressRecord[]>([]);
   const [selectedActress, setSelectedActress] = useState<ActressRecord | null>(
@@ -55,6 +57,7 @@ export function ActressesPage({
   const [searchText, setSearchText] = useState("");
   const [displayNameType, setDisplayNameType] = useState<DisplayMode>("recordDefault");
   const [selectedCupSizes, setSelectedCupSizes] = useState<CupSize[]>([]);
+  const [avatarUrlsById, setAvatarUrlsById] = useState<Record<string, string>>({});
   const [actressTagsById, setActressTagsById] = useState<Record<string, TagRecord[]>>({});
   const [pendingSuggestion, setPendingSuggestion] =
     useState<AssociationSuggestion | null>(null);
@@ -87,9 +90,6 @@ export function ActressesPage({
             nextActresses[0] ??
             null,
         );
-        if (focusActressId) {
-          onFocusConsumed?.();
-        }
       })
       .catch(() => {
         if (isActive) {
@@ -109,7 +109,7 @@ export function ActressesPage({
     return () => {
       isActive = false;
     };
-  }, [focusActressId, notify, onFocusConsumed]);
+  }, [focusActressId, notify]);
 
   useEffect(() => {
     if (!focusActressId || actresses.length === 0) {
@@ -119,9 +119,34 @@ export function ActressesPage({
     const focusedActress = actresses.find((actress) => actress.id === focusActressId);
     if (focusedActress) {
       setSelectedActress(focusedActress);
-      onFocusConsumed?.();
     }
-  }, [actresses, focusActressId, onFocusConsumed]);
+  }, [actresses, focusActressId]);
+
+  useEffect(() => {
+    let isActive = true;
+
+    Promise.all(
+      actresses.map(async (actress) => {
+        if (!actress.avatarPath) {
+          return null;
+        }
+
+        try {
+          return [actress.id, await cachedAssetUrl(actress.avatarPath)] as const;
+        } catch {
+          return null;
+        }
+      }),
+    ).then((entries) => {
+      if (isActive) {
+        setAvatarUrlsById(Object.fromEntries(entries.filter(isImageEntry)));
+      }
+    });
+
+    return () => {
+      isActive = false;
+    };
+  }, [actresses]);
 
   async function handleCreateActress(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -172,6 +197,7 @@ export function ActressesPage({
       setSelectedActress(nextActresses[0] ?? null);
       return nextActresses;
     });
+    onBackToLibrary?.();
   }
 
   function handleActressTagsChanged(actressId: string, tags: TagRecord[]) {
@@ -219,85 +245,97 @@ export function ActressesPage({
     tagsByActressId: actressTagsById,
   });
 
+  const detailActress = focusActressId
+    ? actresses.find((actress) => actress.id === focusActressId) ?? selectedActress
+    : null;
+
+  if (focusActressId) {
+    return (
+      <main className="h-full bg-[#101014] text-[var(--color-text)]">
+        <section className="nvy-page-scroll px-10 py-8">
+          <div className="mx-auto grid max-w-[76rem] gap-5">
+            <button
+              type="button"
+              onClick={onBackToLibrary}
+              className="w-fit rounded-full border border-[var(--color-border)] bg-[var(--color-surface-soft)] px-4 py-2 text-sm text-[var(--color-muted)] transition hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text)]"
+            >
+              ← 返回女优库
+            </button>
+            {detailActress ? (
+              <ActressDetailForm
+                key={detailActress.id}
+                actress={detailActress}
+                onSaved={handleActressSaved}
+                onDeleted={handleActressDeleted}
+                onTagsChanged={handleActressTagsChanged}
+              />
+            ) : (
+              <EmptyState text={isLoading ? "正在加载女优详情" : "没有找到这位女优"} />
+            )}
+          </div>
+        </section>
+      </main>
+    );
+  }
+
   return (
-    <main className="min-h-screen bg-[var(--color-background)] px-6 py-7 text-[var(--color-text)] lg:px-8">
-      <section className="mx-auto grid max-w-7xl gap-6">
-        <header className="flex flex-wrap items-end justify-between gap-4 border-b border-[var(--color-border)] pb-5">
-          <div>
-            <p className="mb-2 text-sm font-medium tracking-normal text-[var(--color-accent-soft)]">
-              Library
-            </p>
-            <h1 className="text-3xl font-semibold tracking-normal text-[var(--color-text-strong)]">
-              女优库
-            </h1>
-          </div>
-          <p className="text-sm text-[var(--color-muted)]">
-            {isLoading ? "加载中" : `${actresses.length} 条女优`}
-          </p>
-        </header>
-
-        <form
-          onSubmit={handleCreateActress}
-          className="grid gap-3 border-b border-[var(--color-border)] pb-6 md:grid-cols-[1fr_1.3fr_auto]"
-        >
-          <Input
-            name="name"
-            label="姓名"
-            placeholder="输入女优姓名"
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-          />
-          <Input
-            name="avatarPath"
-            label="头像路径"
-            placeholder="可稍后由匹配流程补充"
-            value={avatarPath}
-            onChange={(event) => setAvatarPath(event.target.value)}
-          />
-          <div className="flex items-end">
-            <Button type="submit" disabled={isSubmitting}>
-              添加
-            </Button>
-          </div>
-        </form>
-
-        <section className="sticky top-0 z-20 grid gap-3 border-b border-[var(--color-border)] bg-[linear-gradient(180deg,var(--color-background)_0%,rgba(17,17,20,0.94)_100%)] py-4 backdrop-blur-xl">
-          <div className="grid gap-3 md:grid-cols-[1.4fr_220px]">
+    <main className="h-full bg-[#101014] text-[var(--color-text)]">
+      <section className="grid h-full grid-rows-[auto_auto_minmax(0,1fr)] px-10 py-7">
+        <section className="grid gap-3">
+          <div className="grid grid-cols-[minmax(0,1fr)_auto_auto_auto_auto] items-center gap-2">
             <Input
               name="actress-search"
-              label="搜索"
-              placeholder="姓名 / 别名 / #标签"
+              aria-label="搜索女优"
+              placeholder="搜索框"
               value={searchText}
               onChange={(event) => setSearchText(event.target.value)}
+              className="h-14 rounded-[1.35rem] border-[rgba(255,255,255,0.08)] bg-[rgba(39,39,43,0.96)] px-5 text-base"
+            />
+            <Button type="button" className="h-14 rounded-[1.2rem] px-6">
+              搜索
+            </Button>
+            <CupFilterSelect
+              selectedCupSizes={selectedCupSizes}
+              onToggle={handleToggleCupSize}
             />
             <DisplayNameSelect
               value={displayNameType}
               includeRecordDefault
+              compact
               onChange={setDisplayNameType}
             />
+            <Button type="submit" form="actress-create-form" disabled={isSubmitting} className="h-14 rounded-[1.2rem] px-6">
+              新增
+            </Button>
           </div>
-          <div className="flex flex-wrap gap-2">
-            {allowedCupSizes.map((cupSize) => (
-              <button
-                key={cupSize}
-                type="button"
-                onClick={() => handleToggleCupSize(cupSize)}
-                className={[
-                  "rounded-full border px-3 py-1 text-xs transition",
-                  selectedCupSizes.includes(cupSize)
-                    ? "border-[var(--color-accent)] bg-[rgba(159,136,219,0.18)] text-[var(--color-text-strong)]"
-                    : "border-[var(--color-border)] bg-[var(--color-surface-soft)] text-[var(--color-muted)]",
-                ].join(" ")}
-              >
-                {cupSize}
-              </button>
-            ))}
-          </div>
+          <form
+            id="actress-create-form"
+            onSubmit={handleCreateActress}
+            className="grid grid-cols-[1fr_1.7fr] gap-3 rounded-[1.35rem] border border-[var(--color-border)] bg-[rgba(28,27,33,0.7)] p-3"
+          >
+            <Input
+              name="name"
+              aria-label="姓名"
+              placeholder="姓名"
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+            />
+            <Input
+              name="avatarPath"
+              aria-label="头像路径"
+              placeholder="头像路径，可稍后由匹配流程补充"
+              value={avatarPath}
+              onChange={(event) => setAvatarPath(event.target.value)}
+            />
+          </form>
         </section>
 
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,0.95fr)_minmax(420px,1.05fr)]">
-          <section className="relative grid max-h-[calc(100vh-220px)] content-start gap-3 overflow-y-auto pr-1 sm:grid-cols-2 xl:grid-cols-3">
-            <div className="pointer-events-none sticky top-0 z-10 col-span-full h-6 bg-gradient-to-b from-[var(--color-background)] to-transparent" />
+        <p className="py-3 text-right text-xs text-[var(--color-muted)]">
+          {isLoading ? "加载中" : `${actresses.length} 条女优`}
+        </p>
+
+        <section className="nvy-page-scroll nvy-fade-top pr-1">
+          <div className="grid grid-cols-5 gap-x-12 gap-y-8 pb-8">
             {filteredActresses.length === 0 ? (
               <EmptyState text={isLoading ? "正在加载女优" : "还没有女优记录"} />
             ) : (
@@ -305,30 +343,14 @@ export function ActressesPage({
                 <ActressCard
                   key={actress.id}
                   actress={actress}
+                  avatarUrl={avatarUrlsById[actress.id]}
                   displayNameType={displayNameType}
-                  isSelected={selectedActress?.id === actress.id}
-                  onClick={() => setSelectedActress(actress)}
+                  onClick={() => onOpenDetail?.(actress.id)}
                 />
               ))
             )}
-          </section>
-
-          <aside className="min-w-0 border-l border-[var(--color-border)] pl-6">
-            {selectedActress ? (
-              <ActressDetailForm
-                key={selectedActress.id}
-                actress={selectedActress}
-                onSaved={handleActressSaved}
-                onDeleted={handleActressDeleted}
-                onTagsChanged={handleActressTagsChanged}
-              />
-            ) : (
-              <p className="text-sm text-[var(--color-muted)]">
-                选择一条女优查看和编辑详情。
-              </p>
-            )}
-          </aside>
-        </div>
+          </div>
+        </section>
 
         <ConfirmDialog
           open={Boolean(pendingSuggestion)}
@@ -637,7 +659,7 @@ function ActressDetailForm({
   return (
     <form
       onSubmit={handleSave}
-      className="sticky top-7 grid max-h-[calc(100vh-56px)] gap-4 overflow-y-auto rounded-2xl border border-[var(--color-border)] bg-[var(--color-panel)] p-5 shadow-[var(--shadow-panel)]"
+      className="grid gap-4 rounded-[1.6rem] border border-[var(--color-border)] bg-[rgba(28,27,34,0.78)] p-5 shadow-[var(--shadow-panel)]"
     >
       <div className="flex items-start justify-between gap-4">
         <div>
@@ -941,40 +963,68 @@ function ActressDetailForm({
 
 type ActressCardProps = {
   actress: ActressRecord;
+  avatarUrl?: string;
   displayNameType: DisplayMode;
-  isSelected: boolean;
   onClick: () => void;
 };
 
-function ActressCard({ actress, displayNameType, isSelected, onClick }: ActressCardProps) {
+function ActressCard({ actress, avatarUrl, displayNameType, onClick }: ActressCardProps) {
   const displayName = displayActressName(
     actress,
     displayNameType === "recordDefault" ? undefined : displayNameType,
   );
+  const cupText = actress.cupSize ? `${actress.cupSize}Cup` : "未知Cup";
+  const ageText = actress.birthday ? `${calculateAge(actress.birthday)}岁` : "年龄未知";
 
   return (
     <button
       type="button"
       onClick={onClick}
-      className={[
-        "grid min-w-0 place-items-center gap-3 rounded-2xl border px-3 py-4 text-center transition",
-        isSelected
-          ? "border-[var(--color-accent)] bg-[rgba(165,140,223,0.16)]"
-          : "border-[var(--color-border)] bg-[var(--color-surface-soft)] hover:border-[var(--color-border-strong)] hover:bg-[var(--color-surface-hover)]",
-      ].join(" ")}
+      className="grid min-w-0 place-items-center gap-3 text-center transition hover:opacity-90"
     >
-      <span className="grid h-24 w-24 shrink-0 place-items-center rounded-full border border-[var(--color-border)] bg-[var(--color-surface-strong)] text-2xl font-semibold text-[var(--color-accent-soft)]">
-        {actress.name.trim().slice(0, 1) || "?"}
+      <span className="grid h-28 w-28 shrink-0 place-items-center overflow-hidden rounded-full border border-[rgba(255,255,255,0.1)] bg-[var(--color-surface-strong)] text-2xl font-semibold text-[var(--color-accent-soft)] shadow-[0_18px_44px_rgba(0,0,0,0.3)]">
+        {avatarUrl ? (
+          <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
+        ) : (
+          actress.name.trim().slice(0, 1) || "?"
+        )}
       </span>
       <span className="grid w-full min-w-0 gap-1">
         <span className="block truncate text-sm font-semibold text-[var(--color-text-strong)]">
           {displayName}
         </span>
         <span className="block truncate text-xs text-[var(--color-muted)]">
-          {actress.avatarPath || actress.simplifiedChineseName || "暂无头像"}
+          {cupText}
+        </span>
+        <span className="block truncate text-xs text-[var(--color-muted)]">
+          {ageText}
         </span>
       </span>
     </button>
+  );
+}
+
+function CupFilterSelect({
+  selectedCupSizes,
+  onToggle,
+}: {
+  selectedCupSizes: CupSize[];
+  onToggle: (cupSize: CupSize) => void;
+}) {
+  const label = selectedCupSizes.length === 0 ? "Cup" : `${selectedCupSizes.length} Cup`;
+
+  return (
+    <Dropdown
+      label={label}
+      align="end"
+      triggerClassName="h-14 w-full rounded-[1.2rem]"
+      items={allowedCupSizes.map((cupSize) => ({
+        label: `${cupSize}Cup`,
+        description: selectedCupSizes.includes(cupSize) ? "已选中" : "点击切换筛选",
+        selected: selectedCupSizes.includes(cupSize),
+        onSelect: () => onToggle(cupSize),
+      }))}
+    />
   );
 }
 
@@ -982,10 +1032,12 @@ function DisplayNameSelect({
   value,
   onChange,
   includeRecordDefault = false,
+  compact = false,
 }: {
   value: DisplayMode;
   onChange: (value: DisplayMode) => void;
   includeRecordDefault?: boolean;
+  compact?: boolean;
 }) {
   const options: Array<{ value: DisplayMode; label: string; description: string }> = [
     ...(includeRecordDefault
@@ -1006,12 +1058,12 @@ function DisplayNameSelect({
   const selectedOption = options.find((option) => option.value === value) ?? options[0];
 
   return (
-    <label className="grid gap-2 text-left text-sm text-[var(--color-muted)]">
-      <span>显示名</span>
+    <label className={compact ? "grid text-left text-sm text-[var(--color-muted)]" : "grid gap-2 text-left text-sm text-[var(--color-muted)]"}>
+      {compact ? null : <span>显示名</span>}
       <Dropdown
         label={selectedOption.label}
         align="end"
-        triggerClassName="h-11 w-full rounded-2xl"
+        triggerClassName={compact ? "h-14 w-full rounded-[1.2rem]" : "h-11 w-full rounded-2xl"}
         items={options.map((option) => ({
           label: option.label,
           description: option.description,
@@ -1056,10 +1108,28 @@ function SaveStatusText({ status }: { status: SaveStatus }) {
 
 function EmptyState({ text }: { text: string }) {
   return (
-    <div className="rounded-2xl border border-dashed border-[var(--color-border)] px-4 py-8 text-center text-sm text-[var(--color-muted)] sm:col-span-2">
+    <div className="col-span-full rounded-2xl border border-dashed border-[var(--color-border)] px-4 py-8 text-center text-sm text-[var(--color-muted)]">
       {text}
     </div>
   );
+}
+
+function calculateAge(birthday: string) {
+  const birthDate = new Date(birthday);
+
+  if (Number.isNaN(birthDate.getTime())) {
+    return "未知";
+  }
+
+  const today = new Date();
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const monthDelta = today.getMonth() - birthDate.getMonth();
+
+  if (monthDelta < 0 || (monthDelta === 0 && today.getDate() < birthDate.getDate())) {
+    age -= 1;
+  }
+
+  return age;
 }
 
 function metadataCandidateTitle(candidate: MetadataCandidate) {
@@ -1142,4 +1212,10 @@ function toActressInput(draft: ActressDraft): ActressInput {
     wikipediaZhUrl: draft.wikipediaZhUrl,
     note: draft.note,
   };
+}
+
+function isImageEntry(
+  entry: readonly [string, string] | null,
+): entry is readonly [string, string] {
+  return entry !== null;
 }
