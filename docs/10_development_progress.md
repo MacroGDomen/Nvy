@@ -1945,3 +1945,43 @@
 ### 待人工复验
 
 需要完全关闭当前 `corepack pnpm tauri:dev` 进程后重新启动，因为 `tauri.conf.json` 修改不会热更新。重新打开软件后，进入影片详情页和影片库，确认已经写入 `cache/covers/...jpg` 的封面能够正常显示。
+
+## 32. 2026-06-24 新增记录自动元数据匹配与 gfriends 女优头像接入
+
+### 问题目标
+
+用户要求新增两个能力：
+
+1. 通过番号新增影片时，自动匹配资料和封面并填入。
+2. 输入女优名字后，接入 gfriends 逻辑匹配女优头像，并一次完成可用闭环。
+
+### 修正内容
+
+| 文件 | 修改 |
+|---|---|
+| `src-tauri/src/metadata/gfriends.rs` | 新增 gfriends 适配器：读取并缓存 `Filetree.json`，按女优名精确匹配头像文件，生成 raw GitHub 头像下载 URL。文件树缓存到应用数据目录 `cache/gfriends-filetree.json`，7 天内复用。 |
+| `src-tauri/src/metadata/mod.rs` | 女优元数据匹配优先查询 gfriends；命中后生成包含 `avatar_source_path`、匹配日文名和 `metadata_source=gfriends` 的候选；失败时继续回退本地占位候选。 |
+| `src-tauri/src/commands/metadata.rs` | 女优匹配命令传入应用数据目录，供 gfriends 文件树缓存使用。 |
+| `src/pages/VideosPage.tsx` | 新增影片成功后自动执行“匹配资料 -> 使用首个候选 -> 重新读取影片”的流程；匹配失败不阻断基础影片创建。 |
+| `src/pages/ActressesPage.tsx` | 新增女优成功且未手动填写头像路径时，自动执行“匹配资料 -> 使用首个候选 -> 重新读取女优”的流程；候选卡片增加姓名、日文名、头像 URL、来源等字段预览。 |
+| `docs/05_feature_backlog.md` | 更新 F014 / F015 状态说明：影片新增后自动匹配已接入，女优 gfriends 头像匹配已接入；DMM/FANZA 仍待后续验证。 |
+
+### 验证结果
+
+| 命令 | 结果 |
+|---|---|
+| `cargo fmt --manifest-path src-tauri\Cargo.toml --check` | 通过 |
+| `cargo test --manifest-path src-tauri\Cargo.toml` | 通过，36 个 Rust 测试全部通过 |
+| `corepack pnpm test` | 通过，8 个测试文件、25 个测试用例全部通过 |
+| `corepack pnpm build` | 通过，`tsc --noEmit` 和 `vite build` 均成功 |
+| `Invoke-WebRequest -Uri https://raw.githubusercontent.com/gfriends/gfriends/master/Filetree.json -Method Head -UseBasicParsing` | 通过，返回 HTTP 200，确认 gfriends 文件树原始地址可访问 |
+| 实际下载 `Filetree.json` 并按 UTF-8 解码搜索 `三上悠亜.jpg` / `吉高寧々.jpg` | 通过，确认当前网络能获取真实文件树，且文件树包含可匹配的日文女优名 |
+
+### 待人工复验
+
+需要在真实 Tauri 桌面窗口中复验：
+
+1. 在影片库输入番号新增影片，确认新增后会自动写入匹配到的标题、来源链接、演员名单、封面缓存路径，并在影片库显示封面。
+2. 在女优库输入女优名新增女优，确认首次匹配会等待 gfriends 文件树下载；命中后头像会缓存到 `cache/actresses/...jpg` 并显示。
+3. 第二次匹配女优头像时应复用 `cache/gfriends-filetree.json`，不再重新下载完整文件树。
+4. 若 gfriends 未命中或网络失败，影片 / 女优基础记录仍应创建成功，可以继续手动编辑。

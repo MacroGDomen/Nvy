@@ -1,4 +1,5 @@
 mod browser_cookies;
+mod gfriends;
 mod javbus;
 
 use rusqlite::{params, Connection, Error as SqlError};
@@ -121,6 +122,7 @@ pub fn match_video_metadata(
 
 pub fn match_actress_metadata(
     db_path: &PathBuf,
+    app_data_dir: &Path,
     account_id: &str,
     actress_id: &str,
     query: &str,
@@ -138,28 +140,52 @@ pub fn match_actress_metadata(
         return Ok(Vec::new());
     }
 
-    let payload = ActressCandidatePayload {
-        actress_id: actress_id.to_string(),
-        name: Some(query.clone()),
-        simplified_chinese_name: Some(query.clone()),
-        traditional_chinese_name: None,
-        japanese_name: None,
-        romanized_name: None,
-        avatar_source_path: None,
-        measurements: None,
-        cup_size: None,
-        birthday: None,
-        height_cm: None,
-        debut_date: None,
-        wikipedia_zh_url: None,
-        metadata_source: "local-placeholder-actress-provider".to_string(),
+    let (source, payload) = match gfriends::fetch_actress_metadata(app_data_dir, &query) {
+        Ok(Some(metadata)) => (
+            "gfriends",
+            ActressCandidatePayload {
+                actress_id: actress_id.to_string(),
+                name: Some(query.clone()),
+                simplified_chinese_name: Some(query.clone()),
+                traditional_chinese_name: None,
+                japanese_name: (metadata.matched_name != query).then_some(metadata.matched_name),
+                romanized_name: None,
+                avatar_source_path: Some(metadata.avatar_url),
+                measurements: None,
+                cup_size: None,
+                birthday: None,
+                height_cm: None,
+                debut_date: None,
+                wikipedia_zh_url: None,
+                metadata_source: "gfriends".to_string(),
+            },
+        ),
+        _ => (
+            "local-placeholder-actress-provider",
+            ActressCandidatePayload {
+                actress_id: actress_id.to_string(),
+                name: Some(query.clone()),
+                simplified_chinese_name: Some(query.clone()),
+                traditional_chinese_name: None,
+                japanese_name: None,
+                romanized_name: None,
+                avatar_source_path: None,
+                measurements: None,
+                cup_size: None,
+                birthday: None,
+                height_cm: None,
+                debut_date: None,
+                wikipedia_zh_url: None,
+                metadata_source: "local-placeholder-actress-provider".to_string(),
+            },
+        ),
     };
     let candidate = insert_candidate(
         &connection,
         account_id,
         "actress",
         &candidate_query(actress_id, &query),
-        "local-placeholder-actress-provider",
+        source,
         &serde_json::to_string(&payload).map_err(|error| error.to_string())?,
     )?;
 
@@ -609,6 +635,7 @@ mod tests {
 
         let candidates = match_actress_metadata(
             &db_path,
+            std::env::temp_dir().as_path(),
             &session.account_id,
             &actress.id,
             "__nvy_no_results__",
@@ -622,14 +649,20 @@ mod tests {
     #[test]
     fn applies_actress_candidate() {
         let db_path = test_db_path("actress");
-        let app_data_dir =
-            std::env::temp_dir().join(format!("nvy-metadata-assets-{}", Uuid::new_v4()));
         let session = register_account(&db_path, "MetaUser3", "abc123").unwrap();
         let actress =
             library::create_actress(&db_path, &session.account_id, actress_input("Old")).unwrap();
 
-        let candidates =
-            match_actress_metadata(&db_path, &session.account_id, &actress.id, "New Name").unwrap();
+        let app_data_dir =
+            std::env::temp_dir().join(format!("nvy-metadata-assets-{}", Uuid::new_v4()));
+        let candidates = match_actress_metadata(
+            &db_path,
+            &app_data_dir,
+            &session.account_id,
+            &actress.id,
+            "New Name",
+        )
+        .unwrap();
         apply_metadata_candidate(
             &db_path,
             &app_data_dir,

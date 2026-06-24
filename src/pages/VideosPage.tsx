@@ -166,8 +166,24 @@ export function VideosPage({
         title,
         workType,
       });
-      setVideos((currentVideos) => [created, ...currentVideos]);
-      setSelectedVideo(created);
+      const nextVideo = await applyFirstVideoMetadataCandidate(
+        session.accountId,
+        created,
+      );
+      const [nextTags, nextActresses] = await Promise.all([
+        listVideoTags(session.accountId, nextVideo.id),
+        listVideoActresses(session.accountId, nextVideo.id),
+      ]);
+      setVideos((currentVideos) => [nextVideo, ...currentVideos]);
+      setVideoTagsById((currentTagsById) => ({
+        ...currentTagsById,
+        [nextVideo.id]: nextTags,
+      }));
+      setVideoActressesById((currentActressesById) => ({
+        ...currentActressesById,
+        [nextVideo.id]: nextActresses,
+      }));
+      setSelectedVideo(nextVideo);
       setCode("");
       setTitle("");
       setWorkType("single");
@@ -1361,6 +1377,30 @@ function toVideoInput(draft: VideoDraft): VideoInput {
     workType: draft.workType,
     review: draft.review,
   };
+}
+
+async function applyFirstVideoMetadataCandidate(
+  accountId: string,
+  video: VideoRecord,
+): Promise<VideoRecord> {
+  const query = video.code.trim();
+  if (!query) {
+    return video;
+  }
+
+  try {
+    const candidates = await matchVideoMetadata(accountId, video.id, query);
+    const candidate = candidates[0];
+    if (!candidate) {
+      return video;
+    }
+
+    await applyMetadataCandidate(accountId, candidate.id);
+    const nextVideos = await listVideos(accountId);
+    return nextVideos.find((nextVideo) => nextVideo.id === video.id) ?? video;
+  } catch {
+    return video;
+  }
 }
 
 function isImageEntry(

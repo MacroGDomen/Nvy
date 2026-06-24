@@ -160,15 +160,23 @@ export function ActressesPage({
         name,
         avatarPath,
       });
-      setActresses((currentActresses) => [created, ...currentActresses]);
-      setSelectedActress(created);
+      const nextActress = avatarPath.trim()
+        ? created
+        : await applyFirstActressMetadataCandidate(session.accountId, created);
+      const nextTags = await listActressTags(session.accountId, nextActress.id);
+      setActresses((currentActresses) => [nextActress, ...currentActresses]);
+      setActressTagsById((currentTagsById) => ({
+        ...currentTagsById,
+        [nextActress.id]: nextTags,
+      }));
+      setSelectedActress(nextActress);
       setName("");
       setAvatarPath("");
       notify({ title: "女优已添加", variant: "success" });
 
       const suggestions = await listAssociationSuggestions(
         session.accountId,
-        created.id,
+        nextActress.id,
       );
       setPendingSuggestion(suggestions[0] ?? null);
     } catch {
@@ -752,6 +760,7 @@ function ActressDetailForm({
                     {candidate.source}
                   </p>
                 </div>
+                <MetadataCandidateDetails candidate={candidate} />
                 <div className="flex flex-wrap justify-end gap-2">
                   <Button
                     type="button"
@@ -1155,6 +1164,86 @@ function metadataCandidateTitle(candidate: MetadataCandidate) {
   }
 }
 
+function MetadataCandidateDetails({ candidate }: { candidate: MetadataCandidate }) {
+  const details = metadataCandidateDetails(candidate);
+
+  if (details.length === 0) {
+    return (
+      <p className="text-xs text-[var(--color-muted)]">
+        候选中没有可预览的字段；仍可尝试写入已有字段。
+      </p>
+    );
+  }
+
+  return (
+    <dl className="grid gap-x-4 gap-y-1 text-xs text-[var(--color-muted)] sm:grid-cols-2">
+      {details.map((detail) => (
+        <div key={detail.label} className="grid min-w-0 grid-cols-[4.5rem_minmax(0,1fr)] gap-2">
+          <dt className="text-[var(--color-muted-subtle)]">{detail.label}</dt>
+          <dd className="min-w-0 truncate text-[var(--color-text)]" title={detail.value}>
+            {detail.value}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+function metadataCandidateDetails(candidate: MetadataCandidate) {
+  try {
+    const payload = JSON.parse(candidate.payloadJson) as {
+      name?: string | null;
+      simplified_chinese_name?: string | null;
+      traditional_chinese_name?: string | null;
+      japanese_name?: string | null;
+      romanized_name?: string | null;
+      avatar_source_path?: string | null;
+      measurements?: string | null;
+      cup_size?: string | null;
+      birthday?: string | null;
+      height_cm?: number | null;
+      debut_date?: string | null;
+      wikipedia_zh_url?: string | null;
+      metadata_source?: string | null;
+    };
+    const details: Array<{ label: string; value: string }> = [];
+
+    addCandidateDetail(details, "姓名", payload.name);
+    addCandidateDetail(details, "简中", payload.simplified_chinese_name);
+    addCandidateDetail(details, "繁中", payload.traditional_chinese_name);
+    addCandidateDetail(details, "日文", payload.japanese_name);
+    addCandidateDetail(details, "罗马音", payload.romanized_name);
+    addCandidateDetail(details, "头像", payload.avatar_source_path);
+    addCandidateDetail(details, "三围", payload.measurements);
+    addCandidateDetail(details, "Cup", payload.cup_size);
+    addCandidateDetail(details, "生日", payload.birthday);
+    addCandidateDetail(
+      details,
+      "身高",
+      typeof payload.height_cm === "number" ? `${payload.height_cm} cm` : undefined,
+    );
+    addCandidateDetail(details, "出道", payload.debut_date);
+    addCandidateDetail(details, "链接", payload.wikipedia_zh_url);
+    addCandidateDetail(details, "来源", payload.metadata_source);
+
+    return details;
+  } catch {
+    return [];
+  }
+}
+
+function addCandidateDetail(
+  details: Array<{ label: string; value: string }>,
+  label: string,
+  value?: string | null,
+) {
+  const normalized = value?.trim();
+
+  if (normalized) {
+    details.push({ label, value: normalized });
+  }
+}
+
 type ActressDraft = {
   name: string;
   avatarPath: string;
@@ -1214,6 +1303,33 @@ function toActressInput(draft: ActressDraft): ActressInput {
     wikipediaZhUrl: draft.wikipediaZhUrl,
     note: draft.note,
   };
+}
+
+async function applyFirstActressMetadataCandidate(
+  accountId: string,
+  actress: ActressRecord,
+): Promise<ActressRecord> {
+  const query = actress.name.trim();
+  if (!query) {
+    return actress;
+  }
+
+  try {
+    const candidates = await matchActressMetadata(accountId, actress.id, query);
+    const candidate = candidates[0];
+    if (!candidate) {
+      return actress;
+    }
+
+    await applyMetadataCandidate(accountId, candidate.id);
+    const nextActresses = await listActresses(accountId);
+    return (
+      nextActresses.find((nextActress) => nextActress.id === actress.id) ??
+      actress
+    );
+  } catch {
+    return actress;
+  }
 }
 
 function isImageEntry(

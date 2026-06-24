@@ -21,7 +21,17 @@ pub fn match_actress_metadata(
     query: String,
 ) -> Result<Vec<MetadataCandidate>, String> {
     let db_path = crate::db::database_path(&app).map_err(|error| error.to_string())?;
-    crate::metadata::match_actress_metadata(&db_path, &account_id, &actress_id, &query)
+    let app_data_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|error| error.to_string())?;
+    crate::metadata::match_actress_metadata(
+        &db_path,
+        &app_data_dir,
+        &account_id,
+        &actress_id,
+        &query,
+    )
 }
 
 #[tauri::command]
