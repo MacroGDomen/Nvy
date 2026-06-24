@@ -13,13 +13,17 @@ import type {
 import { requireSession } from "../services/auth/sessionStore";
 import { Button } from "../components/ui/Button";
 import { useToast } from "../components/ui/Toast";
-import { rotateItems } from "../domain/carousel";
 
 type HomePageProps = {
   onOpenDetail: (target: { route: "actresses"; id: string } | { route: "videos"; id: string }) => void;
 };
 
 type ImageMap = Record<string, string>;
+type CarouselItem<T> = {
+  item: T;
+  key: string;
+  slot: number;
+};
 
 export function HomePage({ onOpenDetail }: HomePageProps) {
   const [preference, setPreference] = useState("");
@@ -122,7 +126,7 @@ export function HomePage({ onOpenDetail }: HomePageProps) {
     }
 
     const timer = window.setInterval(() => {
-      setActressOffset((currentOffset) => (currentOffset + 1) % actresses.length);
+      setActressOffset((currentOffset) => currentOffset - 1);
     }, 1000);
 
     return () => window.clearInterval(timer);
@@ -134,7 +138,7 @@ export function HomePage({ onOpenDetail }: HomePageProps) {
     }
 
     const timer = window.setInterval(() => {
-      setVideoOffset((currentOffset) => (currentOffset + 1) % videos.length);
+      setVideoOffset((currentOffset) => currentOffset - 1);
     }, 1000);
 
     return () => window.clearInterval(timer);
@@ -165,11 +169,11 @@ export function HomePage({ onOpenDetail }: HomePageProps) {
   }
 
   const visibleActresses = useMemo(
-    () => rotateItems(actresses, actressOffset, 7),
+    () => buildCarouselWindow(actresses, actressOffset, 7, (actress) => actress.id),
     [actresses, actressOffset],
   );
   const visibleVideos = useMemo(
-    () => rotateItems(videos, videoOffset, 5),
+    () => buildCarouselWindow(videos, videoOffset, 5, (video) => video.id),
     [videos, videoOffset],
   );
 
@@ -217,18 +221,20 @@ function HomeActressCarousel({
   imageUrls,
   onOpen,
 }: {
-  actresses: ActressRecord[];
+  actresses: Array<CarouselItem<ActressRecord>>;
   imageUrls: ImageMap;
   onOpen: (actressId: string) => void;
 }) {
   const arc = [
-    { x: "2%", y: "19%", scale: 0.58, opacity: 0.36 },
-    { x: "15%", y: "10%", scale: 0.74, opacity: 0.58 },
-    { x: "30%", y: "4%", scale: 0.9, opacity: 0.78 },
-    { x: "46%", y: "0%", scale: 1.18, opacity: 1 },
-    { x: "63%", y: "4%", scale: 0.9, opacity: 0.78 },
-    { x: "78%", y: "10%", scale: 0.74, opacity: 0.58 },
-    { x: "91%", y: "19%", scale: 0.58, opacity: 0.36 },
+    { x: "-8%", y: "27%", scale: 0.42, opacity: 0, zIndex: 1 },
+    { x: "7%", y: "20%", scale: 0.58, opacity: 0.36, zIndex: 2 },
+    { x: "22%", y: "11%", scale: 0.74, opacity: 0.58, zIndex: 3 },
+    { x: "39%", y: "5%", scale: 0.9, opacity: 0.78, zIndex: 4 },
+    { x: "56%", y: "0%", scale: 1.18, opacity: 1, zIndex: 6 },
+    { x: "73%", y: "5%", scale: 0.9, opacity: 0.78, zIndex: 4 },
+    { x: "90%", y: "11%", scale: 0.74, opacity: 0.58, zIndex: 3 },
+    { x: "105%", y: "20%", scale: 0.58, opacity: 0.32, zIndex: 2 },
+    { x: "119%", y: "27%", scale: 0.42, opacity: 0, zIndex: 1 },
   ];
 
   return (
@@ -237,21 +243,22 @@ function HomeActressCarousel({
         <EmptyPanel className="mx-auto mt-14 w-80" text="还没有女优记录" />
       ) : (
         <div className="relative h-full">
-          {actresses.map((actress, index) => {
-            const position = arc[index] ?? arc[0];
+          {actresses.map(({ item: actress, key, slot }) => {
+            const position = arc[slot] ?? arc[0];
             const displayName = actress.simplifiedChineseName || actress.name;
 
             return (
               <button
-                key={actress.id}
+                key={key}
                 type="button"
                 onClick={() => onOpen(actress.id)}
-                className="absolute grid -translate-x-1/2 place-items-center gap-2 text-center transition duration-500 hover:opacity-100"
+                className="absolute grid -translate-x-1/2 place-items-center gap-2 text-center transition-[left,top,opacity,transform] duration-[900ms] ease-in-out hover:opacity-100"
                 style={{
                   left: position.x,
                   top: position.y,
                   opacity: position.opacity,
                   transform: `translateX(-50%) scale(${position.scale})`,
+                  zIndex: position.zIndex,
                 }}
               >
                 <span
@@ -284,16 +291,18 @@ function HomeVideoCarousel({
   imageUrls,
   onOpen,
 }: {
-  videos: VideoRecord[];
+  videos: Array<CarouselItem<VideoRecord>>;
   imageUrls: ImageMap;
   onOpen: (videoId: string) => void;
 }) {
   const arc = [
-    { x: "14%", y: "48%", scale: 0.72, opacity: 0.55 },
-    { x: "31%", y: "38%", scale: 0.9, opacity: 0.78 },
-    { x: "50%", y: "31%", scale: 1.2, opacity: 1 },
-    { x: "69%", y: "38%", scale: 0.9, opacity: 0.78 },
-    { x: "86%", y: "48%", scale: 0.72, opacity: 0.55 },
+    { x: "0%", y: "58%", scale: 0.5, opacity: 0, zIndex: 1 },
+    { x: "18%", y: "49%", scale: 0.72, opacity: 0.55, zIndex: 2 },
+    { x: "37%", y: "39%", scale: 0.9, opacity: 0.78, zIndex: 4 },
+    { x: "56%", y: "31%", scale: 1.2, opacity: 1, zIndex: 7 },
+    { x: "75%", y: "39%", scale: 0.9, opacity: 0.78, zIndex: 3 },
+    { x: "94%", y: "49%", scale: 0.72, opacity: 0.55, zIndex: 2 },
+    { x: "112%", y: "58%", scale: 0.5, opacity: 0, zIndex: 1 },
   ];
 
   return (
@@ -302,21 +311,22 @@ function HomeVideoCarousel({
         <EmptyPanel className="mx-auto mt-32 w-96" text="还没有影片记录" />
       ) : (
         <div className="relative h-full">
-          {videos.map((video, index) => {
-            const position = arc[index] ?? arc[0];
+          {videos.map(({ item: video, key, slot }) => {
+            const position = arc[slot] ?? arc[0];
             const title = `${video.code} ${video.title || ""}`.trim();
 
             return (
               <button
-                key={video.id}
+                key={key}
                 type="button"
                 onClick={() => onOpen(video.id)}
-                className="absolute grid -translate-x-1/2 gap-2 text-left transition duration-500 hover:opacity-100"
+                className="absolute grid -translate-x-1/2 gap-2 text-left transition-[left,top,opacity,transform] duration-[900ms] ease-in-out hover:opacity-100"
                 style={{
                   left: position.x,
                   top: position.y,
                   opacity: position.opacity,
                   transform: `translateX(-50%) scale(${position.scale})`,
+                  zIndex: position.zIndex,
                 }}
               >
                 <span className="grid h-36 w-56 place-items-center overflow-hidden rounded-[1.25rem] border border-[rgba(255,255,255,0.12)] bg-[var(--color-input)] text-sm font-semibold text-[var(--color-accent-soft)] shadow-[0_18px_56px_rgba(0,0,0,0.44)]">
@@ -396,4 +406,33 @@ function isImageEntry(
   entry: readonly [string, string] | null,
 ): entry is readonly [string, string] {
   return entry !== null;
+}
+
+function buildCarouselWindow<T>(
+  items: readonly T[],
+  firstVisibleOffset: number,
+  visibleCount: number,
+  getId: (item: T) => string,
+): Array<CarouselItem<T>> {
+  if (items.length === 0 || visibleCount <= 0) {
+    return [];
+  }
+
+  const windowCount = Math.min(visibleCount + 2, items.length + 2);
+  const start = firstVisibleOffset - 1;
+
+  return Array.from({ length: windowCount }, (_, slot) => {
+    const absoluteIndex = start + slot;
+    const item = items[positiveModulo(absoluteIndex, items.length)];
+
+    return {
+      item,
+      key: `${getId(item)}:${absoluteIndex}`,
+      slot,
+    };
+  });
+}
+
+function positiveModulo(value: number, divisor: number) {
+  return ((value % divisor) + divisor) % divisor;
 }
