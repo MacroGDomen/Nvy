@@ -101,7 +101,7 @@ fn parse_video_page(
     }))
 }
 
-fn request_cookie_header(browser_cookie_header: Option<&str>) -> String {
+pub(crate) fn request_cookie_header(browser_cookie_header: Option<&str>) -> String {
     match browser_cookie_header {
         Some(value) if !value.trim().is_empty() => {
             format!("{JAVBUS_PUBLIC_COOKIE_HEADER}; {}", value.trim())

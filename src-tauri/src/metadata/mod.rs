@@ -196,13 +196,21 @@ fn apply_video_candidate(
     let payload: VideoCandidatePayload =
         serde_json::from_str(&candidate.payload_json).map_err(|error| error.to_string())?;
     ensure_video_exists(connection, account_id, &payload.video_id)?;
-    let cover_path = if let Some(source_path) = payload.cover_source_path {
-        Some(cache_candidate_image(
+    let browser_cookie_header = browser_cookies::load_metadata_cookie_header(
+        read_metadata_cookie_access(connection, account_id)?,
+    )
+    .unwrap_or(None);
+    let image_cookie_header = javbus::request_cookie_header(browser_cookie_header.as_deref());
+    let cover_path = if let Some(source_path) = payload.cover_source_path.as_deref() {
+        cache_candidate_image(
             app_data_dir,
-            &source_path,
+            source_path,
             crate::assets::ImageCacheKind::Cover,
             &payload.video_id,
-        )?)
+            Some(&image_cookie_header),
+            payload.source_url.as_deref(),
+        )
+        .ok()
     } else {
         None
     };
@@ -253,13 +261,16 @@ fn apply_actress_candidate(
     let payload: ActressCandidatePayload =
         serde_json::from_str(&candidate.payload_json).map_err(|error| error.to_string())?;
     ensure_actress_exists(connection, account_id, &payload.actress_id)?;
-    let avatar_path = if let Some(source_path) = payload.avatar_source_path {
-        Some(cache_candidate_image(
+    let avatar_path = if let Some(source_path) = payload.avatar_source_path.as_deref() {
+        cache_candidate_image(
             app_data_dir,
-            &source_path,
+            source_path,
             crate::assets::ImageCacheKind::Actress,
             &payload.actress_id,
-        )?)
+            None,
+            payload.wikipedia_zh_url.as_deref(),
+        )
+        .ok()
     } else {
         None
     };
@@ -310,10 +321,19 @@ fn cache_candidate_image(
     source: &str,
     kind: crate::assets::ImageCacheKind,
     owner_id: &str,
+    cookie_header: Option<&str>,
+    referer: Option<&str>,
 ) -> Result<String, String> {
     if source.starts_with("http://") || source.starts_with("https://") {
-        crate::assets::cache_remote_image(app_data_dir, source, kind, owner_id)
-            .map(|image| image.relative_path)
+        crate::assets::cache_remote_image_with_headers(
+            app_data_dir,
+            source,
+            kind,
+            owner_id,
+            cookie_header,
+            referer,
+        )
+        .map(|image| image.relative_path)
     } else {
         crate::assets::cache_local_image(app_data_dir, Path::new(source), kind, owner_id)
             .map(|image| image.relative_path)

@@ -821,6 +821,7 @@ function VideoDetailForm({
                     {candidate.source}
                   </p>
                 </div>
+                <MetadataCandidateDetails candidate={candidate} />
                 <div className="flex flex-wrap justify-end gap-2">
                   <Button
                     type="button"
@@ -1240,6 +1241,80 @@ function metadataCandidateTitle(candidate: MetadataCandidate) {
     return payload.title || payload.code || payload.name || candidate.query;
   } catch {
     return candidate.query;
+  }
+}
+
+function MetadataCandidateDetails({ candidate }: { candidate: MetadataCandidate }) {
+  const details = metadataCandidateDetails(candidate);
+
+  if (details.length === 0) {
+    return (
+      <p className="text-xs text-[var(--color-muted)]">
+        候选中没有可预览的字段；仍可尝试写入已有字段。
+      </p>
+    );
+  }
+
+  return (
+    <dl className="grid gap-x-4 gap-y-1 text-xs text-[var(--color-muted)] sm:grid-cols-2">
+      {details.map((detail) => (
+        <div key={detail.label} className="grid min-w-0 grid-cols-[4.5rem_minmax(0,1fr)] gap-2">
+          <dt className="text-[var(--color-muted-subtle)]">{detail.label}</dt>
+          <dd className="min-w-0 truncate text-[var(--color-text)]" title={detail.value}>
+            {detail.value}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+function metadataCandidateDetails(candidate: MetadataCandidate) {
+  try {
+    const payload = JSON.parse(candidate.payloadJson) as {
+      code?: string | null;
+      title?: string | null;
+      source_url?: string | null;
+      summary?: string | null;
+      actor_names?: string | null;
+      release_date?: string | null;
+      duration_minutes?: number | null;
+      cover_source_path?: string | null;
+      metadata_source?: string | null;
+    };
+    const details: Array<{ label: string; value: string }> = [];
+
+    addCandidateDetail(details, "番号", payload.code);
+    addCandidateDetail(details, "标题", payload.title);
+    addCandidateDetail(details, "发行日", payload.release_date);
+    addCandidateDetail(
+      details,
+      "片长",
+      typeof payload.duration_minutes === "number"
+        ? `${payload.duration_minutes} 分钟`
+        : undefined,
+    );
+    addCandidateDetail(details, "演员", payload.actor_names);
+    addCandidateDetail(details, "简介", payload.summary);
+    addCandidateDetail(details, "封面", payload.cover_source_path);
+    addCandidateDetail(details, "链接", payload.source_url);
+    addCandidateDetail(details, "来源", payload.metadata_source);
+
+    return details;
+  } catch {
+    return [];
+  }
+}
+
+function addCandidateDetail(
+  details: Array<{ label: string; value: string }>,
+  label: string,
+  value?: string | null,
+) {
+  const normalized = value?.trim();
+
+  if (normalized) {
+    details.push({ label, value: normalized });
   }
 }
 

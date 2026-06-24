@@ -88,22 +88,30 @@ pub fn cache_local_image(
     })
 }
 
-pub fn cache_remote_image(
+pub fn cache_remote_image_with_headers(
     app_data_dir: &Path,
     source_url: &str,
     kind: ImageCacheKind,
     owner_id: &str,
+    cookie_header: Option<&str>,
+    referer: Option<&str>,
 ) -> Result<CachedImage, String> {
     let owner_id = normalize_owner_id(owner_id)?;
     let extension = image_extension_from_url(source_url)?;
-    let response = reqwest::blocking::Client::builder()
+    let client = reqwest::blocking::Client::builder()
         .timeout(Duration::from_secs(20))
         .build()
-        .map_err(|error| error.to_string())?
-        .get(source_url)
-        .header(reqwest::header::USER_AGENT, "Mozilla/5.0")
-        .send()
         .map_err(|error| error.to_string())?;
+    let mut request = client
+        .get(source_url)
+        .header(reqwest::header::USER_AGENT, "Mozilla/5.0");
+    if let Some(cookie_header) = cookie_header.filter(|value| !value.trim().is_empty()) {
+        request = request.header(reqwest::header::COOKIE, cookie_header.trim());
+    }
+    if let Some(referer) = referer.filter(|value| !value.trim().is_empty()) {
+        request = request.header(reqwest::header::REFERER, referer.trim());
+    }
+    let response = request.send().map_err(|error| error.to_string())?;
     if !response.status().is_success() {
         return Err(format!(
             "Remote image request failed with status {}.",

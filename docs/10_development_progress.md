@@ -1853,3 +1853,95 @@
 ### 待人工复验
 
 需要在真实 Tauri 桌面窗口中复验：滚动到大模型设置底部时，本地存储是否紧接在其下方显示；右侧数据导入导出是否仍保持单列且无错位。
+
+## 29. 2026-06-24 影片元数据候选展示与写入失败修正
+
+### 问题现象
+
+用户提供影片详情页截图后确认两个问题：
+
+1. 点击“匹配资料”后，候选卡片只显示标题和来源，无法判断是否匹配到了发行日、片长、演员、简介、封面等其他数据。
+2. 点击“使用候选”后右上角提示“使用候选失败”，自动获取的信息无法写入当前影片。
+
+### 修正内容
+
+| 文件 | 修改 |
+|---|---|
+| `src/pages/VideosPage.tsx` | 为影片元数据候选卡片增加字段预览，展示番号、标题、发行日、片长、演员、简介、封面链接、来源链接和元数据来源等候选 payload 中存在的字段。 |
+| `src-tauri/src/metadata/mod.rs` | 影片和女优候选写入时，如果远程封面或头像缓存失败，不再中断整次候选写入；封面或头像会跳过，其他文本元数据继续写入 SQLite。 |
+
+### 修复原因
+
+候选 payload 已经包含多字段，但前端只渲染标题和来源，导致用户无法判断实际匹配内容。候选写入失败的高概率原因是远程封面图片下载或缓存失败时，后端把整个候选写入流程作为失败返回；现在改为图片缓存失败不阻断文本字段写入。
+
+### 验证结果
+
+| 命令 | 结果 |
+|---|---|
+| `cargo fmt --manifest-path src-tauri\Cargo.toml --check` | 通过 |
+| `cargo test --manifest-path src-tauri\Cargo.toml` | 通过，33 个 Rust 测试全部通过 |
+| `corepack pnpm test` | 通过，8 个测试文件、25 个测试用例全部通过 |
+| `corepack pnpm build` | 通过，`tsc --noEmit` 和 `vite build` 均成功 |
+
+### 待人工复验
+
+需要在真实 Tauri 桌面窗口中复验：重新点击“匹配资料”后候选卡片是否显示多字段预览；点击“使用候选”后，即使封面图无法下载，也应能写入标题、来源链接、简介、演员、发行日、片长等可用字段。
+
+## 30. 2026-06-24 JavBus 封面缓存请求头修正
+
+### 问题现象
+
+用户确认上一轮候选文本字段写入问题已修复，但影片封面仍没有成功获取。
+
+### 根因判断
+
+联网验证 `https://www.javbus.com/MVSD-607` 时，未带足验证状态的请求会被重定向到 `driver-verify` 年龄验证页。此前匹配影片页面时会带 JavBus 公共 Cookie 和可选浏览器 Cookie，但候选写入阶段下载封面图片时只带 `User-Agent`，没有复用 Cookie，也没有带来源页 `Referer`。因此在页面元数据可以匹配成功的情况下，封面图片下载仍可能被年龄验证或防盗链拦截。
+
+### 修正内容
+
+| 文件 | 修改 |
+|---|---|
+| `src-tauri/src/assets/mod.rs` | 远程图片缓存函数改为支持可选 `Cookie` 和 `Referer` 请求头，用于受验证状态或防盗链影响的图片地址。 |
+| `src-tauri/src/metadata/javbus.rs` | 将 JavBus 请求 Cookie 拼接函数开放给同模块使用，确保封面下载和页面匹配使用一致的公共 Cookie / 浏览器 Cookie 组合。 |
+| `src-tauri/src/metadata/mod.rs` | 应用影片候选时读取当前账号的元数据 Cookie 设置，下载封面时带上 JavBus Cookie 和候选来源页 `Referer`。 |
+
+### 验证结果
+
+| 命令 | 结果 |
+|---|---|
+| `cargo fmt --manifest-path src-tauri\Cargo.toml --check` | 通过 |
+| `cargo test --manifest-path src-tauri\Cargo.toml` | 通过，33 个 Rust 测试全部通过 |
+
+### 待人工复验
+
+需要在真实 Tauri 桌面窗口中重新执行“匹配资料”并点击“使用候选”，确认封面是否写入“封面缓存路径”并在影片库 / 详情页显示。如果 JavBus 仍要求真实浏览器会话，需要在设置中打开“允许元数据来源读取浏览器 Cookie”后再次测试。
+
+## 31. 2026-06-24 本地缓存封面显示修复
+
+### 问题现象
+
+用户确认影片封面已经成功缓存到应用数据目录下，例如 `cache/covers/464fa625-a2d4-4cad-9db3-dca5be18702d.jpg`，但影片详情页和影片库中仍显示破图或占位内容。
+
+### 根因判断
+
+封面缓存文件已经存在，说明问题不在元数据匹配或图片下载阶段。前端虽然通过 `convertFileSrc` 把本地绝对路径转换为 WebView 可加载 URL，但 `src-tauri/tauri.conf.json` 没有启用 Tauri asset protocol，也没有授权应用缓存目录。Tauri WebView 因此会拒绝加载本地缓存文件，表现为 `<img>` 已渲染但图片不显示。
+
+### 修正内容
+
+| 文件 | 修改 |
+|---|---|
+| `src-tauri/tauri.conf.json` | 在 `app.security` 中启用 `assetProtocol`，并将访问范围限定为 `$APPDATA/cache/**/*`，允许软件自己的封面和女优头像缓存被 WebView 读取。 |
+
+### 验证结果
+
+| 命令 | 结果 |
+|---|---|
+| `corepack pnpm test` | 通过，8 个测试文件、25 个测试用例全部通过 |
+| `corepack pnpm build` | 通过，`tsc --noEmit` 和 `vite build` 均成功 |
+| `cargo fmt --manifest-path src-tauri\Cargo.toml --check` | 通过 |
+| `cargo test --manifest-path src-tauri\Cargo.toml` | 通过，33 个 Rust 测试全部通过 |
+| `corepack pnpm tauri info` | 通过，Tauri CLI 能正常读取当前工程配置 |
+
+### 待人工复验
+
+需要完全关闭当前 `corepack pnpm tauri:dev` 进程后重新启动，因为 `tauri.conf.json` 修改不会热更新。重新打开软件后，进入影片详情页和影片库，确认已经写入 `cache/covers/...jpg` 的封面能够正常显示。
