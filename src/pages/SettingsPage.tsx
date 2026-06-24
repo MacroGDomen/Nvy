@@ -63,7 +63,7 @@ type LlmSettingsDraft = {
 
 export function SettingsPage() {
   return (
-    <main className="min-h-screen bg-[var(--color-background)] px-6 py-7 text-[var(--color-text)] lg:px-8">
+    <main className="nvy-page-scroll bg-[var(--color-background)] px-6 py-7 text-[var(--color-text)] lg:px-8">
       <section className="mx-auto grid max-w-7xl gap-6">
         <header className="border-b border-[var(--color-border)] pb-5">
           <p className="mb-2 text-sm font-medium tracking-normal text-[var(--color-accent-soft)]">
@@ -74,12 +74,12 @@ export function SettingsPage() {
           </h1>
         </header>
 
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1.25fr)_minmax(360px,0.75fr)]">
-          <LlmSettingsSection />
+        <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1.25fr)_minmax(360px,0.75fr)]">
           <div className="grid content-start gap-6">
+            <LlmSettingsSection />
             <StorageSection />
-            <ImportExportSection />
           </div>
+          <ImportExportSection />
         </div>
 
         <div className="grid gap-6 xl:grid-cols-2">
@@ -217,7 +217,7 @@ function LlmSettingsSection() {
   }
 
   return (
-    <section className="grid gap-5 rounded-2xl border border-[var(--color-border)] bg-[var(--color-panel)] p-5 shadow-[var(--shadow-panel)]">
+    <section className="grid content-start gap-5 rounded-2xl border border-[var(--color-border)] bg-[var(--color-panel)] p-5 shadow-[var(--shadow-panel)]">
       <div>
         <h2 className="text-xl font-semibold text-[var(--color-text-strong)]">
           大模型设置
@@ -227,9 +227,9 @@ function LlmSettingsSection() {
         </p>
       </div>
 
-      <form onSubmit={handleSaveSettings} className="grid gap-4">
-        <div className="grid gap-3 lg:grid-cols-3">
-          <label className="grid gap-2 text-left text-sm text-[var(--color-muted)]">
+      <form onSubmit={handleSaveSettings} className="grid content-start gap-4">
+        <div className="grid min-w-0 gap-3 lg:grid-cols-3">
+          <label className="grid min-w-0 gap-2 text-left text-sm text-[var(--color-muted)]">
             <span>接口类型</span>
             <Dropdown
               label={selectedApiType.label}
@@ -326,7 +326,7 @@ function LlmSettingsSection() {
           </label>
         </div>
 
-        <section className="grid gap-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-input)] p-4">
+        <section className="grid min-w-0 gap-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-input)] p-4">
           <label className="flex items-start gap-3 text-left text-sm text-[var(--color-muted)]">
             <input
               type="checkbox"
@@ -628,8 +628,8 @@ function ImportExportSection() {
         </p>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-2">
-        <section className="grid gap-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-input)] p-4">
+      <div className="grid min-w-0 gap-4">
+        <section className="grid min-w-0 gap-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-input)] p-4">
           <h3 className="text-sm font-semibold text-[var(--color-text-strong)]">
             普通导出
           </h3>
@@ -645,7 +645,7 @@ function ImportExportSection() {
           </Button>
         </section>
 
-        <section className="grid gap-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-input)] p-4">
+        <section className="grid min-w-0 gap-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-input)] p-4">
           <h3 className="text-sm font-semibold text-[var(--color-text-strong)]">
             加密导出
           </h3>
@@ -668,7 +668,7 @@ function ImportExportSection() {
           </Button>
         </section>
 
-        <section className="grid gap-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-input)] p-4">
+        <section className="grid min-w-0 gap-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-input)] p-4">
           <h3 className="text-sm font-semibold text-[var(--color-text-strong)]">
             普通导入
           </h3>

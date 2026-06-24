@@ -28,12 +28,12 @@ export function Dropdown({
         <Button
           variant="secondary"
           className={cn(
-            "justify-between border border-[var(--color-border)] bg-[var(--color-input)] px-4 text-left shadow-none data-[state=open]:border-[var(--color-border-strong)] data-[state=open]:bg-[var(--color-surface-strong)]",
+            "min-w-0 justify-between overflow-hidden border border-[var(--color-border)] bg-[var(--color-input)] px-4 text-left shadow-none data-[state=open]:border-[var(--color-border-strong)] data-[state=open]:bg-[var(--color-surface-strong)]",
             triggerClassName,
           )}
         >
-          <span className="truncate">{label}</span>
-          <span className="ml-3 text-xs text-[var(--color-muted-subtle)]">v</span>
+          <span className="min-w-0 flex-1 truncate">{label}</span>
+          <span className="ml-3 shrink-0 text-xs text-[var(--color-muted-subtle)]">v</span>
         </Button>
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
