@@ -1,9 +1,9 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import {
-  buildRecommendationPayload,
   cachedAssetUrl,
   listActresses,
   listVideos,
+  requestHomeRecommendation,
 } from "../services/desktopApi";
 import type {
   ActressRecord,
@@ -25,6 +25,12 @@ type HomePageProps = {
 type ImageMap = Record<string, string>;
 const HOME_VIDEO_CAROUSEL_CENTER_X = "59%";
 const HOME_ACTRESS_CAROUSEL_CENTER_X = "54%";
+const HOME_GREETINGS = [
+  "{username}，你今天想从谁开始？",
+  "{username}，今天你想从哪里开始？",
+  "{username}，今天你中意的剧情是什么？",
+  "{username}，今天你想要什么类型？",
+] as const;
 
 type CarouselItem<T> = {
   item: T;
@@ -34,7 +40,9 @@ type CarouselItem<T> = {
 
 export function HomePage({ onOpenDetail }: HomePageProps) {
   const [preference, setPreference] = useState("");
+  const [greeting] = useState(() => buildHomeGreeting(requireSession().username));
   const [payload, setPayload] = useState<RecommendationPayload | null>(null);
+  const [recommendationText, setRecommendationText] = useState("");
   const [videos, setVideos] = useState<VideoRecord[]>([]);
   const [actresses, setActresses] = useState<ActressRecord[]>([]);
   const [videoImages, setVideoImages] = useState<ImageMap>({});
@@ -157,11 +165,15 @@ export function HomePage({ onOpenDetail }: HomePageProps) {
 
     try {
       const session = requireSession();
-      const nextPayload = await buildRecommendationPayload(session.accountId, preference);
+      const { payload: nextPayload, text } = await requestHomeRecommendation(
+        session.accountId,
+        preference,
+      );
       setPayload(nextPayload);
+      setRecommendationText(text);
       notify({
-        title: "推荐候选已构造",
-        description: "当前会先预览发送边界；真实模型调用等待 HTTP 客户端接入。",
+        title: "推荐已生成",
+        description: "已根据当前资料库候选和你的输入生成推荐。",
         variant: "info",
       });
     } catch {
@@ -187,7 +199,7 @@ export function HomePage({ onOpenDetail }: HomePageProps) {
   return (
     <main className="relative h-full overflow-hidden bg-[#101014] text-[var(--color-text)]">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_54%_55%,rgba(71,84,157,0.28),transparent_31%),radial-gradient(circle_at_75%_22%,rgba(202,139,183,0.12),transparent_24%)]" />
-      <section className="relative grid h-full grid-rows-[minmax(0,1fr)_15.5rem] px-14 pb-8 pt-9">
+      <section className="relative grid h-full grid-rows-[minmax(0,1fr)_13.25rem] px-14 pb-8 pt-9">
         <div className="relative min-h-0">
           {isLoadingLibrary ? (
             <div className="absolute right-0 top-0 text-xs text-[var(--color-muted)]">
@@ -210,9 +222,9 @@ export function HomePage({ onOpenDetail }: HomePageProps) {
           />
         </div>
 
-        <section className="grid content-end justify-items-center gap-5">
-          <p className="text-center text-3xl font-medium tracking-normal text-[rgba(245,240,250,0.84)]">
-            你好，今天你想从谁开始？
+        <section className="grid content-end justify-items-center gap-3">
+          <p className="text-center text-[1.7rem] font-medium leading-tight tracking-normal text-[rgba(245,240,250,0.84)]">
+            {greeting}
           </p>
           <HomeRecommendationBox
             preference={preference}
@@ -220,7 +232,9 @@ export function HomePage({ onOpenDetail }: HomePageProps) {
             onPreferenceChange={setPreference}
             onSubmit={handleSubmit}
           />
-          {payload ? <RecommendationPreview payload={payload} /> : null}
+          {payload ? (
+            <RecommendationPreview payload={payload} text={recommendationText} />
+          ) : null}
         </section>
       </section>
     </main>
@@ -379,14 +393,14 @@ function HomeRecommendationBox({
   return (
       <form
         onSubmit={onSubmit}
-        className="grid w-[min(61rem,78vw)] gap-3 rounded-[1.45rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(35,35,38,0.94)] px-4 py-4 shadow-[0_28px_80px_rgba(0,0,0,0.38)]"
+        className="grid w-[min(61rem,78vw)] gap-2 rounded-[1.45rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(35,35,38,0.94)] px-4 py-3 shadow-[0_28px_80px_rgba(0,0,0,0.38)]"
       >
         <textarea
           value={preference}
           onChange={(event) => onPreferenceChange(event.target.value)}
-          rows={3}
+          rows={2}
           placeholder="写下今天想看的偏好、关键词或排除条件"
-          className="min-h-20 resize-none rounded-2xl border-0 bg-transparent px-1 py-1 text-[var(--color-text)] outline-none placeholder:text-[var(--color-muted-subtle)]"
+          className="min-h-14 resize-none rounded-2xl border-0 bg-transparent px-1 py-1 text-[var(--color-text)] outline-none placeholder:text-[var(--color-muted-subtle)]"
         />
         <div className="flex flex-wrap items-center justify-between gap-3">
           <span className="text-xs text-[var(--color-muted)]">本地候选 + 首页推荐</span>
@@ -398,11 +412,20 @@ function HomeRecommendationBox({
   );
 }
 
-function RecommendationPreview({ payload }: { payload: RecommendationPayload }) {
+function RecommendationPreview({
+  payload,
+  text,
+}: {
+  payload: RecommendationPayload;
+  text: string;
+}) {
   return (
-    <section className="max-w-[52rem] text-center text-xs text-[var(--color-muted)]">
-      当前参考上限：{payload.referenceLimit === 0 ? "不限" : payload.referenceLimit}
-      ，候选合计 {payload.videos.length + payload.actresses.length} 条。
+    <section className="max-h-24 w-[min(61rem,78vw)] overflow-y-auto rounded-2xl border border-[var(--color-border)] bg-[rgba(28,27,33,0.72)] px-4 py-3 text-left text-sm leading-6 text-[var(--color-text)]">
+      <p className="whitespace-pre-wrap">{text}</p>
+      <p className="mt-2 text-xs text-[var(--color-muted)]">
+        当前参考上限：{payload.referenceLimit === 0 ? "不限" : payload.referenceLimit}
+        ，候选合计 {payload.videos.length + payload.actresses.length} 条。
+      </p>
     </section>
   );
 }
@@ -419,6 +442,14 @@ function isImageEntry(
   entry: readonly [string, string] | null,
 ): entry is readonly [string, string] {
   return entry !== null;
+}
+
+function buildHomeGreeting(username: string) {
+  const template =
+    HOME_GREETINGS[Math.floor(Math.random() * HOME_GREETINGS.length)] ??
+    HOME_GREETINGS[0];
+
+  return template.replace("{username}", username);
 }
 
 function buildCarouselWindow<T>(

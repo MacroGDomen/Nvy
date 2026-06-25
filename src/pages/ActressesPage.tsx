@@ -160,25 +160,43 @@ export function ActressesPage({
         name,
         avatarPath,
       });
-      const nextActress = avatarPath.trim()
-        ? created
-        : await applyFirstActressMetadataCandidate(session.accountId, created);
-      const nextTags = await listActressTags(session.accountId, nextActress.id);
-      setActresses((currentActresses) => [nextActress, ...currentActresses]);
+      setActresses((currentActresses) => [created, ...currentActresses]);
       setActressTagsById((currentTagsById) => ({
         ...currentTagsById,
-        [nextActress.id]: nextTags,
+        [created.id]: [],
       }));
-      setSelectedActress(nextActress);
+      setSelectedActress(created);
       setName("");
       setAvatarPath("");
       notify({ title: "女优已添加", variant: "success" });
 
-      const suggestions = await listAssociationSuggestions(
-        session.accountId,
-        nextActress.id,
-      );
-      setPendingSuggestion(suggestions[0] ?? null);
+      window.setTimeout(() => {
+        const metadataTask = avatarPath.trim()
+          ? Promise.resolve(created)
+          : applyFirstActressMetadataCandidate(session.accountId, created);
+
+        void metadataTask
+          .then(async (nextActress) => {
+            const [nextTags, suggestions] = await Promise.all([
+              listActressTags(session.accountId, nextActress.id),
+              listAssociationSuggestions(session.accountId, nextActress.id),
+            ]);
+            setActresses((currentActresses) =>
+              currentActresses.map((actress) =>
+                actress.id === nextActress.id ? nextActress : actress,
+              ),
+            );
+            setSelectedActress((currentActress) =>
+              currentActress?.id === nextActress.id ? nextActress : currentActress,
+            );
+            setActressTagsById((currentTagsById) => ({
+              ...currentTagsById,
+              [nextActress.id]: nextTags,
+            }));
+            setPendingSuggestion(suggestions[0] ?? null);
+          })
+          .catch(() => undefined);
+      }, 250);
     } catch {
       notify({
         title: "女优添加失败",
@@ -344,7 +362,7 @@ export function ActressesPage({
           {isLoading ? "加载中" : `${actresses.length} 条女优`}
         </p>
 
-        <section className="nvy-page-scroll nvy-fade-top pr-1">
+        <section className="nvy-page-scroll nvy-fade-top pr-1 pt-5">
           <div className="grid grid-cols-5 gap-x-12 gap-y-8 pb-8">
             {filteredActresses.length === 0 ? (
               <EmptyState text={isLoading ? "正在加载女优" : "还没有女优记录"} />

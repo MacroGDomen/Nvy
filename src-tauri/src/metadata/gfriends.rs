@@ -99,6 +99,27 @@ fn find_avatar_url(filetree: &Value, query: &str) -> Option<(String, String)> {
         }
     }
 
+    for prefix in cjk_prefixes(query) {
+        for (company_name, entries) in content {
+            let Some(entries) = entries.as_object() else {
+                continue;
+            };
+            for (file_name, stored_file_name) in entries {
+                let alias_name = strip_jpg_suffix(file_name);
+                let stored_file_name = stored_file_name.as_str()?;
+                let matched_name = strip_jpg_suffix(stored_file_name);
+                if !starts_with_normalized_prefix(&alias_name, &prefix)
+                    && !starts_with_normalized_prefix(&matched_name, &prefix)
+                {
+                    continue;
+                }
+
+                let avatar_url = build_avatar_url(company_name, stored_file_name);
+                return Some((matched_name, avatar_url));
+            }
+        }
+    }
+
     let loose_query = remove_parenthesized(query);
     if loose_query == query {
         return None;
@@ -181,6 +202,30 @@ fn normalize_match_key(value: &str) -> String {
         .join(" ")
 }
 
+fn cjk_prefixes(value: &str) -> Vec<String> {
+    let chars = value
+        .trim()
+        .chars()
+        .take_while(|character| is_cjk_unified_ideograph(*character))
+        .collect::<Vec<_>>();
+
+    (2..=chars.len())
+        .rev()
+        .map(|length| chars.iter().take(length).collect())
+        .collect()
+}
+
+fn is_cjk_unified_ideograph(character: char) -> bool {
+    matches!(
+        character,
+        '\u{3400}'..='\u{4DBF}' | '\u{4E00}'..='\u{9FFF}' | '\u{F900}'..='\u{FAFF}'
+    )
+}
+
+fn starts_with_normalized_prefix(value: &str, prefix: &str) -> bool {
+    normalize_match_key(value).starts_with(&normalize_match_key(prefix))
+}
+
 fn percent_encode_path_segment(value: &str) -> String {
     let mut output = String::new();
     for byte in value.as_bytes() {
@@ -224,6 +269,13 @@ mod tests {
     #[test]
     fn removes_parenthesized_suffix_when_matching() {
         let (matched_name, _) = find_avatar_url(&sample_filetree(), "Rui Hiduki（测试）").unwrap();
+
+        assert_eq!(matched_name, "妃月るい");
+    }
+
+    #[test]
+    fn falls_back_to_cjk_prefix_for_mixed_kanji_kana_names() {
+        let (matched_name, _) = find_avatar_url(&sample_filetree(), "妃月類").unwrap();
 
         assert_eq!(matched_name, "妃月るい");
     }

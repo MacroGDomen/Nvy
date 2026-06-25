@@ -166,28 +166,47 @@ export function VideosPage({
         title,
         workType,
       });
-      const nextVideo = await applyFirstVideoMetadataCandidate(
-        session.accountId,
-        created,
-      );
-      const [nextTags, nextActresses] = await Promise.all([
-        listVideoTags(session.accountId, nextVideo.id),
-        listVideoActresses(session.accountId, nextVideo.id),
-      ]);
-      setVideos((currentVideos) => [nextVideo, ...currentVideos]);
+      setVideos((currentVideos) => [created, ...currentVideos]);
       setVideoTagsById((currentTagsById) => ({
         ...currentTagsById,
-        [nextVideo.id]: nextTags,
+        [created.id]: [],
       }));
       setVideoActressesById((currentActressesById) => ({
         ...currentActressesById,
-        [nextVideo.id]: nextActresses,
+        [created.id]: [],
       }));
-      setSelectedVideo(nextVideo);
+      setSelectedVideo(created);
       setCode("");
       setTitle("");
       setWorkType("single");
       notify({ title: "影片已添加", variant: "success" });
+
+      window.setTimeout(() => {
+        void applyFirstVideoMetadataCandidate(session.accountId, created)
+          .then(async (nextVideo) => {
+            const [nextTags, nextActresses] = await Promise.all([
+              listVideoTags(session.accountId, nextVideo.id),
+              listVideoActresses(session.accountId, nextVideo.id),
+            ]);
+            setVideos((currentVideos) =>
+              currentVideos.map((video) =>
+                video.id === nextVideo.id ? nextVideo : video,
+              ),
+            );
+            setSelectedVideo((currentVideo) =>
+              currentVideo?.id === nextVideo.id ? nextVideo : currentVideo,
+            );
+            setVideoTagsById((currentTagsById) => ({
+              ...currentTagsById,
+              [nextVideo.id]: nextTags,
+            }));
+            setVideoActressesById((currentActressesById) => ({
+              ...currentActressesById,
+              [nextVideo.id]: nextActresses,
+            }));
+          })
+          .catch(() => undefined);
+      }, 250);
     } catch {
       notify({
         title: "影片添加失败",
@@ -320,7 +339,7 @@ export function VideosPage({
           {isLoading ? "加载中" : `${videos.length} 条影片`}
         </p>
 
-        <section className="nvy-page-scroll nvy-fade-top pr-1">
+        <section className="nvy-page-scroll nvy-fade-top pr-1 pt-5">
           <div className="grid grid-cols-3 gap-x-20 gap-y-9 pb-8">
             {filteredVideos.length === 0 ? (
               <EmptyState text={isLoading ? "正在加载影片" : "还没有影片记录"} />
@@ -590,7 +609,7 @@ function VideoDetailForm({
     } catch {
       notify({
         title: "翻译暂不可用",
-        description: "请确认已启用翻译并保存 API Key；真实模型客户端仍待接入。",
+        description: "请确认已启用翻译、保存 API Key，并检查 Base URL、模型 ID 和网络连接。",
         variant: "error",
       });
     } finally {

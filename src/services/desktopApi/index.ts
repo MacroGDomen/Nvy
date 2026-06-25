@@ -2,6 +2,7 @@ import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import {
   clearLlmApiKeySecret,
   getLlmApiKeyStatus,
+  readLlmApiKey,
   saveLlmApiKeySecret,
 } from "../stronghold/llmSecrets";
 import type {
@@ -22,6 +23,7 @@ import type {
   LlmSettingsInput,
   MetadataCandidate,
   RecommendationPayload,
+  RecommendationResult,
   SecretStatus,
   TagInput,
   TagMatch,
@@ -687,12 +689,8 @@ export async function applyMetadataCandidate(
 
 export async function getLlmSettings(accountId: string): Promise<LlmSettings> {
   const settings = await invoke<RawLlmSettings>("get_llm_settings", { accountId });
-  const secretStatus = await getLlmApiKeyStatus(accountId);
 
-  return {
-    ...mapLlmSettings(settings),
-    hasApiKey: secretStatus.hasApiKey,
-  };
+  return mapLlmSettings(settings);
 }
 
 export async function saveLlmSettings(
@@ -722,6 +720,12 @@ export async function clearLlmApiKey(accountId: string): Promise<SecretStatus> {
   return clearLlmApiKeySecret(accountId);
 }
 
+export async function getStoredLlmApiKeyStatus(
+  accountId: string,
+): Promise<SecretStatus> {
+  return getLlmApiKeyStatus(accountId);
+}
+
 export async function buildRecommendationPayload(
   accountId: string,
   userText: string,
@@ -737,13 +741,43 @@ export async function buildRecommendationPayload(
   return mapRecommendationPayload(payload);
 }
 
+export async function requestHomeRecommendation(
+  accountId: string,
+  userText: string,
+): Promise<RecommendationResult> {
+  const [settings, apiKey, payload] = await Promise.all([
+    getLlmSettings(accountId),
+    readLlmApiKey(accountId),
+    buildRecommendationPayload(accountId, userText),
+  ]);
+  const text = await callLlmText(settings, apiKey, buildRecommendationMessages(payload));
+
+  return { payload, text };
+}
+
 export async function requestVideoTranslation(
   accountId: string,
   videoId: string,
 ): Promise<TranslationState> {
-  const state = await invoke<RawTranslationState>("request_video_translation", {
+  const [settings, apiKey, videos] = await Promise.all([
+    getLlmSettings(accountId),
+    readLlmApiKey(accountId),
+    listVideos(accountId),
+  ]);
+  if (!settings.enableLlmTranslation) {
+    throw new Error("LLM translation is disabled.");
+  }
+  const video = videos.find((nextVideo) => nextVideo.id === videoId);
+  if (!video) {
+    throw new Error("Video record was not found.");
+  }
+  const result = await callLlmText(settings, apiKey, buildTranslationMessages(settings, video));
+  const translated = parseTranslationResult(result);
+  const state = await invoke<RawTranslationState>("apply_video_translation", {
     accountId,
     videoId,
+    translatedTitle: translated.title,
+    translatedSummary: translated.summary,
   });
 
   return mapTranslationState(state);
@@ -759,6 +793,84 @@ export async function cancelVideoTranslation(
   });
 
   return mapTranslationState(state);
+}
+
+async function callLlmText(
+  settings: LlmSettings,
+  apiKey: string | null,
+  messages: Array<{ role: "system" | "user"; content: string }>,
+): Promise<string> {
+  if (!apiKey) {
+    throw new Error("API Key is missing.");
+  }
+  if (!settings.baseUrl?.trim() || !settings.model?.trim()) {
+    throw new Error("LLM Base URL and model are required.");
+  }
+
+  return invoke<string>("request_llm_text", {
+    accountId: settings.accountId,
+    apiKey,
+    messages,
+  });
+}
+
+function buildRecommendationMessages(payload: RecommendationPayload) {
+  return [
+    { role: "system" as const, content: payload.prompt },
+    {
+      role: "user" as const,
+      content: JSON.stringify(
+        {
+          userText: payload.userText,
+          referenceLimit: payload.referenceLimit,
+          videos: payload.videos,
+          actresses: payload.actresses,
+        },
+        null,
+        2,
+      ),
+    },
+  ];
+}
+
+function buildTranslationMessages(settings: LlmSettings, video: VideoRecord) {
+  return [
+    {
+      role: "system" as const,
+      content: settings.translationPrompt,
+    },
+    {
+      role: "user" as const,
+      content: [
+        "请把下面影片资料翻译为自然、简洁的简体中文。",
+        "只返回 JSON，格式为：{\"title\":\"中文标题\",\"summary\":\"中文简介\"}",
+        `番号：${video.code}`,
+        `标题：${video.title ?? ""}`,
+        `简介：${video.summary ?? ""}`,
+      ].join("\n"),
+    },
+  ];
+}
+
+function parseTranslationResult(text: string) {
+  const jsonText = text.match(/\{[\s\S]*\}/)?.[0] ?? text;
+  try {
+    const parsed: unknown = JSON.parse(jsonText);
+    if (isRecord(parsed)) {
+      return {
+        title: typeof parsed.title === "string" ? parsed.title : undefined,
+        summary: typeof parsed.summary === "string" ? parsed.summary : undefined,
+      };
+    }
+  } catch {
+    return { title: undefined, summary: text };
+  }
+
+  return { title: undefined, summary: text };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }
 
 function mapAccountSession(session: RawAccountSession): AccountSession {

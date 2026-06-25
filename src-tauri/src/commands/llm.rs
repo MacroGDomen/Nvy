@@ -2,7 +2,8 @@ use serde::Deserialize;
 use tauri::AppHandle;
 
 use crate::llm::{
-    LlmSettings, LlmSettingsInput, RecommendationPayload, SecretStatus, TranslationState,
+    LlmMessage, LlmSettings, LlmSettingsInput, RecommendationPayload, SecretStatus,
+    TranslationState,
 };
 
 #[derive(Debug, Deserialize)]
@@ -65,6 +66,39 @@ pub fn request_video_translation(
 ) -> Result<TranslationState, String> {
     let db_path = crate::db::database_path(&app).map_err(|error| error.to_string())?;
     crate::llm::request_video_translation(&db_path, &account_id, &video_id)
+}
+
+#[tauri::command]
+pub async fn request_llm_text(
+    app: AppHandle,
+    account_id: String,
+    api_key: String,
+    messages: Vec<LlmMessage>,
+) -> Result<String, String> {
+    let db_path = crate::db::database_path(&app).map_err(|error| error.to_string())?;
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::llm::request_llm_text(&db_path, &account_id, &api_key, messages)
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+pub fn apply_video_translation(
+    app: AppHandle,
+    account_id: String,
+    video_id: String,
+    translated_title: Option<String>,
+    translated_summary: Option<String>,
+) -> Result<TranslationState, String> {
+    let db_path = crate::db::database_path(&app).map_err(|error| error.to_string())?;
+    crate::llm::apply_video_translation(
+        &db_path,
+        &account_id,
+        &video_id,
+        translated_title,
+        translated_summary,
+    )
 }
 
 #[tauri::command]

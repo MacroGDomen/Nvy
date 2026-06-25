@@ -1985,3 +1985,138 @@
 2. 在女优库输入女优名新增女优，确认首次匹配会等待 gfriends 文件树下载；命中后头像会缓存到 `cache/actresses/...jpg` 并显示。
 3. 第二次匹配女优头像时应复用 `cache/gfriends-filetree.json`，不再重新下载完整文件树。
 4. 若 gfriends 未命中或网络失败，影片 / 女优基础记录仍应创建成功，可以继续手动编辑。
+
+## 33. 2026-06-25 首页问候、非阻塞自动匹配和自动关联修正
+
+### 问题目标
+
+用户反馈本轮需要修复以下体验和数据闭环问题：
+
+1. 首页推荐输入框过高，问候语位置需要同步降低。
+2. 首页问候语需要改为带用户名的随机文案，每次打开软件随机显示一条。
+3. 输入番号新增影片后，软件会等待资料匹配完成，期间无法继续操作。
+4. 新增女优后的首次头像匹配同样不应阻塞界面。
+5. gfriends 头像匹配对汉字日文名不够宽容，例如输入 `妃月類` 无法匹配到 `妃月るい`。
+6. 影片和女优资料写入后没有自动补齐关联。
+
+### 修正内容
+
+| 文件 | 修改 |
+|---|---|
+| `src/pages/HomePage.tsx` | 首页问候语改为按当前用户名随机显示四句之一；压低问候语字号和间距；缩小首页推荐输入框高度。 |
+| `src/pages/VideosPage.tsx` | 新增影片时先创建本地词条、立即刷新影片库和详情选中态；首次元数据匹配、候选应用、标签和女优关联刷新改为后台执行，不再阻塞 UI。 |
+| `src/pages/ActressesPage.tsx` | 新增女优时先创建本地词条、立即刷新女优库和详情选中态；首次头像 / 元数据匹配、候选应用、标签和关联建议刷新改为后台执行，不再阻塞 UI。 |
+| `src-tauri/src/metadata/gfriends.rs` | gfriends 匹配增加汉字前缀回退：精确匹配失败后，会用输入开头的 CJK 汉字前缀继续匹配别名名和实际文件名，使 `妃月類` 这类输入可以回退匹配 `妃月るい`。 |
+| `src-tauri/src/library/mod.rs` | 影片只要有演员名单就尝试自动关联已收藏女优，不再限定多人作品；女优新建或编辑后会反向扫描已有影片并补齐关联。 |
+| `src-tauri/src/metadata/mod.rs` | 影片候选写回后同步补跑影片到女优的自动关联；女优候选写回后同步补跑女优到影片的自动关联。 |
+| `docs/05_feature_backlog.md` | 更新 F014、F015、F025 当前状态，记录非阻塞自动匹配、汉字前缀回退和自动关联补齐。 |
+
+### 验证结果
+
+| 命令 | 结果 |
+|---|---|
+| `cargo fmt --manifest-path src-tauri\Cargo.toml --check` | 通过 |
+| `cargo test --manifest-path src-tauri\Cargo.toml` | 通过，37 个 Rust 测试全部通过 |
+| `corepack pnpm test` | 通过，8 个测试文件、25 个测试用例全部通过 |
+| `corepack pnpm build` | 通过，`tsc --noEmit` 和 `vite build` 均成功 |
+
+### 待人工复验
+
+需要在真实 Tauri 桌面窗口中确认：
+
+1. 首页输入框高度和问候语位置是否符合当前视觉预期。
+2. 重启软件多次后，首页问候语是否会在四句文案之间随机变化，并正确显示当前用户名。
+3. 影片库输入番号后点击新增，影片词条是否立即出现，且后台完成匹配后标题、封面、来源链接、演员名单和关联女优会自动更新。
+4. 女优库输入女优名后点击新增，女优词条是否立即出现，且后台完成匹配后头像会自动更新。
+5. 输入 `妃月類` 这类汉字日文名时，是否能通过 gfriends 回退匹配到头像。
+6. 先有影片后新增匹配女优、或先有女优后新增匹配影片时，双方详情页的关联关系是否自动补齐。
+
+## 34. 2026-06-25 重复资料拦截与首次自动匹配卡顿修正
+
+### 问题目标
+
+用户反馈两个后续问题：
+
+1. 影片和女优当前可以重复创建，需要拦截重复资料。
+2. 新增影片 / 女优后的首次自动匹配虽然已经从前端提交链路拆出，但真实使用时仍会造成操作卡顿。
+
+### 修正内容
+
+| 文件 | 修改 |
+|---|---|
+| `src-tauri/src/library/mod.rs` | 新增影片创建 / 更新时按同账号内番号归一化去重；新增女优创建 / 更新时按主名、简中、繁中、日文名、罗马音和曾用名归一化去重；新增对应 Rust 回归测试。 |
+| `src-tauri/src/commands/metadata.rs` | 将 `match_video_metadata`、`match_actress_metadata`、`apply_metadata_candidate` 改为 async command，并通过 `tauri::async_runtime::spawn_blocking` 执行联网抓取、JSON 解析、图片缓存和候选写回，避免阻塞普通 command 执行路径。 |
+| `src/pages/VideosPage.tsx` | 新增影片成功后延迟 250ms 再启动首次自动资料匹配，让本地词条先完成渲染。 |
+| `src/pages/ActressesPage.tsx` | 新增女优成功后延迟 250ms 再启动首次自动头像 / 元数据匹配，让本地词条先完成渲染。 |
+
+### 当前女优名匹配逻辑说明
+
+女优头像匹配优先执行 gfriends 精确匹配：用输入名归一化后，和 gfriends `Filetree.json` 中的头像别名文件名做精确比较。
+
+如果精确匹配失败，会执行“汉字前缀回退匹配”：从输入开头取连续 CJK 汉字，并从长到短尝试前缀匹配。例如 `妃月類` 会先试 `妃月類`，再试 `妃月`，因此可能命中 gfriends 中的 `妃月るい`。这不是翻译，只是降低汉字 / 假名混写差异带来的匹配失败率。风险是同前缀女优可能误命中，所以该逻辑只在精确匹配失败后使用。
+
+### 验证结果
+
+| 命令 | 结果 |
+|---|---|
+| `cargo fmt --manifest-path src-tauri\Cargo.toml --check` | 通过 |
+| `cargo test --manifest-path src-tauri\Cargo.toml` | 通过，39 个 Rust 测试全部通过 |
+| `corepack pnpm test` | 通过，8 个测试文件、25 个测试用例全部通过 |
+| `corepack pnpm build` | 通过，`tsc --noEmit` 和 `vite build` 均成功 |
+
+### 待人工复验
+
+需要在真实 Tauri 桌面窗口中确认：
+
+1. 输入同一番号再次新增影片时，新增失败且不会产生第二条影片。
+2. 输入同一女优名或已存在女优的其他姓名字段再次新增时，新增失败且不会产生第二条女优。
+3. 新增影片后，影片词条应立即出现；JavBus 匹配和封面缓存进行时，侧栏、搜索、详情切换等操作应保持可用。
+4. 新增女优后，女优词条应立即出现；gfriends 文件树下载和头像缓存进行时，侧栏、搜索、详情切换等操作应保持可用。
+
+## 35. 2026-06-25 列表遮挡、设置加载和大模型真实 HTTP 调用修正
+
+### 问题目标
+
+用户反馈三个问题：
+
+1. 影片库和女优库滚动到最上方时，第一排封面 / 头像仍会被搜索栏区域遮住。
+2. 打开设置页后，已经填写过的大模型设置需要延迟约 2-3 秒才显示。
+3. 首页推荐和翻译仍提示“等待 HTTP 客户端接入”，但用户已经填写 Base URL 和 API Key。
+
+### 修正内容
+
+| 文件 | 修改 |
+|---|---|
+| `src/pages/VideosPage.tsx` | 为影片库滚动内容区增加顶部留白，避免第一排影片卡片贴到搜索表单下沿并被遮挡。 |
+| `src/pages/ActressesPage.tsx` | 为女优库滚动内容区增加顶部留白，避免第一排女优头像贴到搜索表单下沿并被遮挡。 |
+| `src/services/desktopApi/index.ts` | 大模型设置读取不再等待 Stronghold API Key 状态；设置页可先显示 Base URL、模型、提示词等非敏感配置。新增首页推荐真实调用和影片翻译真实调用的前端编排。 |
+| `src/pages/SettingsPage.tsx` | API Key 是否已保存改为单独异步刷新，避免拖慢设置表单首屏显示。 |
+| `src-tauri/src/llm/mod.rs` | 新增 Rust 侧大模型 HTTP 调用能力，支持 OpenAI Responses 和 OpenAI 兼容 Chat Completions；新增翻译结果写回函数，写回时保留原始标题 / 简介用于取消翻译。 |
+| `src-tauri/src/commands/llm.rs` | 新增 `request_llm_text` 和 `apply_video_translation` Tauri commands。 |
+| `src-tauri/src/lib.rs` | 注册新增的大模型 commands。 |
+| `src/pages/HomePage.tsx` | 首页推荐改为调用真实模型，并在首页显示模型返回文本，不再只显示候选 payload 提示。 |
+| `docs/05_feature_backlog.md` / `docs/06_acceptance_tests.md` | 更新首页推荐和自动翻译状态：从“待 HTTP 客户端接入”推进为“已实现最小真实调用，待真实服务端手动回归”。 |
+
+### 大模型调用边界说明
+
+API Key 仍保存在前端 Stronghold 中，不写入 SQLite。真实调用时，前端从 Stronghold 读取 API Key，并作为本次内存参数传给 Rust command；Rust 使用 `reqwest` 发 HTTP 请求。这样避免 WebView CORS 问题，也避免把 API Key 持久化到数据库。
+
+DeepSeek 等 OpenAI 兼容服务建议在设置中选择“OpenAI 兼容 Chat Completions”。Base URL 可以填写服务根地址，例如 `https://api.deepseek.com`，客户端会自动拼接 `/chat/completions`；如果已经填写完整 `/chat/completions` 地址，则直接使用。
+
+### 验证结果
+
+| 命令 | 结果 |
+|---|---|
+| `cargo fmt --manifest-path src-tauri\Cargo.toml --check` | 通过 |
+| `cargo test --manifest-path src-tauri\Cargo.toml` | 通过，39 个 Rust 测试全部通过 |
+| `corepack pnpm test` | 通过，8 个测试文件、25 个测试用例全部通过 |
+| `corepack pnpm build` | 通过，`tsc --noEmit` 和 `vite build` 均成功 |
+
+### 待人工复验
+
+需要在真实 Tauri 桌面窗口中确认：
+
+1. 影片库和女优库滚动到最顶部时，第一排封面 / 头像不再被顶部搜索区域遮挡。
+2. 打开设置页时，Base URL、模型 ID、提示词等大模型设置立即显示；API Key 状态允许稍后更新。
+3. 使用有效 API Key 和正确接口类型后，首页推荐能显示模型返回文本。
+4. 启用翻译后，影片详情“重新翻译”能写回中文标题 / 简介，“取消翻译”能恢复原文。

@@ -81,6 +81,12 @@ pub struct TranslationState {
     pub translation_status: Option<String>,
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct LlmMessage {
+    pub role: String,
+    pub content: String,
+}
+
 pub fn get_llm_settings(db_path: &PathBuf, account_id: &str) -> Result<LlmSettings, String> {
     validate_account_id(account_id)?;
     crate::db::initialize_database(db_path).map_err(|error| error.to_string())?;
@@ -239,6 +245,189 @@ pub fn request_video_translation(
     }
 
     Err("LLM HTTP client is not connected yet.".to_string())
+}
+
+pub fn request_llm_text(
+    db_path: &PathBuf,
+    account_id: &str,
+    api_key: &str,
+    messages: Vec<LlmMessage>,
+) -> Result<String, String> {
+    validate_account_id(account_id)?;
+    let api_key = api_key.trim();
+    if api_key.is_empty() {
+        return Err("API Key is missing.".to_string());
+    }
+    if messages.is_empty() {
+        return Err("LLM messages are required.".to_string());
+    }
+
+    crate::db::initialize_database(db_path).map_err(|error| error.to_string())?;
+    let connection = open_connection(db_path)?;
+    ensure_settings_row(&connection, account_id)?;
+    let settings = read_llm_settings(&connection, account_id)?;
+    let base_url = settings
+        .base_url
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| "LLM Base URL is required.".to_string())?;
+    let model = settings
+        .model
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| "LLM model is required.".to_string())?;
+    let api_type = settings.api_type.as_deref().unwrap_or("chat_completions");
+    let endpoint = llm_endpoint(base_url, api_type);
+    let body = if api_type == "responses" {
+        serde_json::json!({
+            "model": model,
+            "input": messages,
+            "temperature": settings.temperature,
+            "max_output_tokens": settings.max_tokens,
+        })
+    } else {
+        serde_json::json!({
+            "model": model,
+            "messages": messages,
+            "temperature": settings.temperature,
+            "max_tokens": settings.max_tokens,
+        })
+    };
+    let client = reqwest::blocking::Client::builder()
+        .timeout(std::time::Duration::from_secs(90))
+        .build()
+        .map_err(|error| error.to_string())?;
+    let response = client
+        .post(endpoint)
+        .bearer_auth(api_key)
+        .header(reqwest::header::CONTENT_TYPE, "application/json")
+        .body(body.to_string())
+        .send()
+        .map_err(|error| error.to_string())?;
+    let status = response.status();
+    let response_text = response.text().map_err(|error| error.to_string())?;
+    let response_body: serde_json::Value =
+        serde_json::from_str(&response_text).map_err(|error| error.to_string())?;
+    if !status.is_success() {
+        return Err(extract_llm_error(&response_body)
+            .unwrap_or_else(|| format!("LLM request failed with status {status}.")));
+    }
+
+    let text = if api_type == "responses" {
+        extract_responses_text(&response_body)
+    } else {
+        extract_chat_completions_text(&response_body)
+    };
+    let text = text.trim();
+    if text.is_empty() {
+        return Err("LLM response is empty.".to_string());
+    }
+
+    Ok(text.to_string())
+}
+
+pub fn apply_video_translation(
+    db_path: &PathBuf,
+    account_id: &str,
+    video_id: &str,
+    translated_title: Option<String>,
+    translated_summary: Option<String>,
+) -> Result<TranslationState, String> {
+    validate_account_id(account_id)?;
+    validate_record_id(video_id, "Video id")?;
+    let translated_title = normalize_optional(translated_title);
+    let translated_summary = normalize_optional(translated_summary);
+    if translated_title.is_none() && translated_summary.is_none() {
+        return Err("Translated title or summary is required.".to_string());
+    }
+
+    crate::db::initialize_database(db_path).map_err(|error| error.to_string())?;
+    let connection = open_connection(db_path)?;
+    let changed = connection
+        .execute(
+            "UPDATE videos
+             SET original_title = CASE
+                    WHEN ?1 IS NULL THEN original_title
+                    WHEN original_title IS NULL THEN title
+                    ELSE original_title
+                 END,
+                 original_summary = CASE
+                    WHEN ?2 IS NULL THEN original_summary
+                    WHEN original_summary IS NULL THEN summary
+                    ELSE original_summary
+                 END,
+                 title = COALESCE(?1, title),
+                 summary = COALESCE(?2, summary),
+                 translation_status = 'translated',
+                 translated_at = CURRENT_TIMESTAMP,
+                 updated_at = CURRENT_TIMESTAMP
+             WHERE id = ?3 AND account_id = ?4",
+            params![translated_title, translated_summary, video_id, account_id],
+        )
+        .map_err(|error| error.to_string())?;
+    if changed == 0 {
+        return Err("Video record was not found.".to_string());
+    }
+
+    Ok(TranslationState {
+        video_id: video_id.to_string(),
+        translation_status: Some("translated".to_string()),
+    })
+}
+
+fn llm_endpoint(base_url: &str, api_type: &str) -> String {
+    let normalized_base = base_url.trim().trim_end_matches('/');
+    if api_type == "responses" {
+        if normalized_base.ends_with("/responses") {
+            normalized_base.to_string()
+        } else {
+            format!("{normalized_base}/responses")
+        }
+    } else if normalized_base.ends_with("/chat/completions") {
+        normalized_base.to_string()
+    } else {
+        format!("{normalized_base}/chat/completions")
+    }
+}
+
+fn extract_chat_completions_text(value: &serde_json::Value) -> String {
+    value
+        .get("choices")
+        .and_then(|choices| choices.as_array())
+        .and_then(|choices| choices.first())
+        .and_then(|choice| choice.get("message"))
+        .and_then(|message| message.get("content"))
+        .and_then(|content| content.as_str())
+        .unwrap_or("")
+        .to_string()
+}
+
+fn extract_responses_text(value: &serde_json::Value) -> String {
+    if let Some(text) = value.get("output_text").and_then(|text| text.as_str()) {
+        return text.to_string();
+    }
+
+    value
+        .get("output")
+        .and_then(|output| output.as_array())
+        .into_iter()
+        .flatten()
+        .flat_map(|item| item.get("content").and_then(|content| content.as_array()))
+        .flatten()
+        .filter_map(|content| content.get("text").and_then(|text| text.as_str()))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn extract_llm_error(value: &serde_json::Value) -> Option<String> {
+    value
+        .get("error")
+        .and_then(|error| error.get("message"))
+        .and_then(|message| message.as_str())
+        .or_else(|| value.get("message").and_then(|message| message.as_str()))
+        .map(str::to_string)
 }
 
 fn read_llm_settings(connection: &Connection, account_id: &str) -> Result<LlmSettings, String> {

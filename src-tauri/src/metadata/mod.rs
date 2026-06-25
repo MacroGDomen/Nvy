@@ -275,6 +275,13 @@ fn apply_video_candidate(
         )
         .map_err(|error| error.to_string())?;
 
+    crate::library::sync_matching_actresses_for_video(
+        connection,
+        account_id,
+        &payload.video_id,
+        payload.actor_names.as_deref(),
+    )?;
+
     Ok(())
 }
 
@@ -338,6 +345,8 @@ fn apply_actress_candidate(
             ],
         )
         .map_err(|error| error.to_string())?;
+
+    crate::library::sync_matching_videos_for_actress(connection, account_id, &payload.actress_id)?;
 
     Ok(())
 }

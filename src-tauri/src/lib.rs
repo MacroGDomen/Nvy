@@ -61,6 +61,8 @@ pub fn run() {
             commands::llm::clear_llm_api_key,
             commands::llm::build_recommendation_payload,
             commands::llm::request_video_translation,
+            commands::llm::request_llm_text,
+            commands::llm::apply_video_translation,
             commands::llm::cancel_video_translation,
             commands::tags::list_tags,
             commands::tags::create_tag,

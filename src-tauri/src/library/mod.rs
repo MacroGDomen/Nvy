@@ -94,6 +94,7 @@ pub fn create_video(
 
     let connection = open_connection(db_path)?;
     let video_id = Uuid::new_v4().to_string();
+    ensure_unique_video_code(&connection, account_id, &input.code, None)?;
     connection
         .execute(
             "INSERT INTO videos (
@@ -133,14 +134,12 @@ pub fn create_video(
         )
         .map_err(|error| error.to_string())?;
 
-    if input.work_type == "multiple" {
-        sync_matching_actresses_for_video(
-            &connection,
-            account_id,
-            &video_id,
-            input.actor_names.as_deref(),
-        )?;
-    }
+    sync_matching_actresses_for_video(
+        &connection,
+        account_id,
+        &video_id,
+        input.actor_names.as_deref(),
+    )?;
 
     get_video(db_path, account_id, &video_id)
 }
@@ -157,6 +156,7 @@ pub fn update_video(
     crate::db::initialize_database(db_path).map_err(|error| error.to_string())?;
 
     let connection = open_connection(db_path)?;
+    ensure_unique_video_code(&connection, account_id, &input.code, Some(video_id))?;
     let changed = connection
         .execute(
             "UPDATE videos
@@ -202,14 +202,12 @@ pub fn update_video(
         return Err("Video record was not found.".to_string());
     }
 
-    if input.work_type == "multiple" {
-        sync_matching_actresses_for_video(
-            &connection,
-            account_id,
-            video_id,
-            input.actor_names.as_deref(),
-        )?;
-    }
+    sync_matching_actresses_for_video(
+        &connection,
+        account_id,
+        video_id,
+        input.actor_names.as_deref(),
+    )?;
 
     get_video(db_path, account_id, video_id)
 }
@@ -296,6 +294,7 @@ pub fn create_actress(
 
     let connection = open_connection(db_path)?;
     let actress_id = Uuid::new_v4().to_string();
+    ensure_unique_actress_names(&connection, account_id, &input, None)?;
     connection
         .execute(
             "INSERT INTO actresses (
@@ -340,6 +339,8 @@ pub fn create_actress(
         )
         .map_err(|error| error.to_string())?;
 
+    sync_matching_videos_for_actress(&connection, account_id, &actress_id)?;
+
     get_actress(db_path, account_id, &actress_id)
 }
 
@@ -355,6 +356,7 @@ pub fn update_actress(
     crate::db::initialize_database(db_path).map_err(|error| error.to_string())?;
 
     let connection = open_connection(db_path)?;
+    ensure_unique_actress_names(&connection, account_id, &input, Some(actress_id))?;
     let changed = connection
         .execute(
             "UPDATE actresses
@@ -400,6 +402,8 @@ pub fn update_actress(
     if changed == 0 {
         return Err("Actress record was not found.".to_string());
     }
+
+    sync_matching_videos_for_actress(&connection, account_id, actress_id)?;
 
     get_actress(db_path, account_id, actress_id)
 }
@@ -920,7 +924,93 @@ fn ensure_actress_exists(
     }
 }
 
-fn sync_matching_actresses_for_video(
+fn ensure_unique_video_code(
+    connection: &Connection,
+    account_id: &str,
+    code: &str,
+    except_video_id: Option<&str>,
+) -> Result<(), String> {
+    let mut statement = connection
+        .prepare("SELECT id, code FROM videos WHERE account_id = ?1")
+        .map_err(|error| error.to_string())?;
+    let rows = statement
+        .query_map(params![account_id], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        })
+        .map_err(|error| error.to_string())?;
+    let current_code = normalize_match_text(code);
+
+    for row in rows {
+        let (video_id, existing_code) = row.map_err(|error| error.to_string())?;
+        if except_video_id.is_some_and(|except_id| except_id == video_id) {
+            continue;
+        }
+        if normalize_match_text(&existing_code) == current_code {
+            return Err("Video code already exists.".to_string());
+        }
+    }
+
+    Ok(())
+}
+
+fn ensure_unique_actress_names(
+    connection: &Connection,
+    account_id: &str,
+    input: &ActressInput,
+    except_actress_id: Option<&str>,
+) -> Result<(), String> {
+    let input_names = actress_input_match_names(input);
+    if input_names.is_empty() {
+        return Ok(());
+    }
+
+    let mut statement = connection
+        .prepare(
+            "SELECT id,
+                    account_id,
+                    name,
+                    simplified_chinese_name,
+                    former_chinese_names,
+                    traditional_chinese_name,
+                    japanese_name,
+                    romanized_name,
+                    default_display_name_type,
+                    avatar_path,
+                    measurements,
+                    cup_size,
+                    birthday,
+                    height_cm,
+                    debut_date,
+                    wikipedia_zh_url,
+                    note,
+                    created_at,
+                    updated_at
+             FROM actresses
+             WHERE account_id = ?1",
+        )
+        .map_err(|error| error.to_string())?;
+    let rows = statement
+        .query_map(params![account_id], map_actress_row)
+        .map_err(|error| error.to_string())?;
+    let actresses = collect_rows(rows)?;
+
+    for actress in actresses {
+        if except_actress_id.is_some_and(|except_id| except_id == actress.id) {
+            continue;
+        }
+        let existing_names = actress_match_names(&actress);
+        if input_names
+            .iter()
+            .any(|name| existing_names.iter().any(|existing| existing == name))
+        {
+            return Err("Actress name already exists.".to_string());
+        }
+    }
+
+    Ok(())
+}
+
+pub(crate) fn sync_matching_actresses_for_video(
     connection: &Connection,
     account_id: &str,
     video_id: &str,
@@ -974,6 +1064,60 @@ fn sync_matching_actresses_for_video(
     Ok(())
 }
 
+pub(crate) fn sync_matching_videos_for_actress(
+    connection: &Connection,
+    account_id: &str,
+    actress_id: &str,
+) -> Result<(), String> {
+    let actress = ensure_actress_exists(connection, account_id, actress_id)?;
+    let match_names = actress_match_names(&actress);
+    if match_names.is_empty() {
+        return Ok(());
+    }
+
+    let mut statement = connection
+        .prepare(
+            "SELECT id,
+                    account_id,
+                    code,
+                    title,
+                    cover_path,
+                    release_date,
+                    duration_minutes,
+                    source_url,
+                    summary,
+                    actress_names,
+                    work_type,
+                    review,
+                    created_at,
+                    updated_at
+             FROM videos
+             WHERE account_id = ?1 AND actress_names IS NOT NULL",
+        )
+        .map_err(|error| error.to_string())?;
+    let rows = statement
+        .query_map(params![account_id], map_video_row)
+        .map_err(|error| error.to_string())?;
+    let videos = collect_rows(rows)?;
+
+    for video in videos {
+        if video
+            .actor_names
+            .as_deref()
+            .is_some_and(|actor_names| actor_names_match(actor_names, &match_names))
+        {
+            connection
+                .execute(
+                    "INSERT OR IGNORE INTO video_actresses (video_id, actress_id) VALUES (?1, ?2)",
+                    params![video.id, actress_id],
+                )
+                .map_err(|error| error.to_string())?;
+        }
+    }
+
+    Ok(())
+}
+
 fn is_video_actress_linked(
     connection: &Connection,
     video_id: &str,
@@ -1002,6 +1146,33 @@ fn actress_match_names(actress: &ActressRecord) -> Vec<String> {
     .flatten()
     .chain(
         actress
+            .former_chinese_names
+            .as_deref()
+            .into_iter()
+            .flat_map(split_actor_names),
+    )
+    .map(normalize_match_text)
+    .filter(|name| !name.is_empty())
+    .fold(Vec::new(), |mut names, name| {
+        if !names.contains(&name) {
+            names.push(name);
+        }
+        names
+    })
+}
+
+fn actress_input_match_names(input: &ActressInput) -> Vec<String> {
+    [
+        Some(input.name.as_str()),
+        input.simplified_chinese_name.as_deref(),
+        input.traditional_chinese_name.as_deref(),
+        input.japanese_name.as_deref(),
+        input.romanized_name.as_deref(),
+    ]
+    .into_iter()
+    .flatten()
+    .chain(
+        input
             .former_chinese_names
             .as_deref()
             .into_iter()
@@ -1249,6 +1420,23 @@ mod tests {
     }
 
     #[test]
+    fn rejects_duplicate_video_codes_for_one_account() {
+        let db_path = test_db_path("video-duplicates");
+        let first =
+            register_account(&db_path, "DupVideo", "abc123").expect("first account registers");
+        let second =
+            register_account(&db_path, "DupVidTwo", "abc123").expect("second account registers");
+
+        create_video(&db_path, &first.account_id, video_input("ABC-001"))
+            .expect("first video creates");
+
+        assert!(create_video(&db_path, &first.account_id, video_input(" abc-001 ")).is_err());
+        assert!(create_video(&db_path, &second.account_id, video_input("ABC-001")).is_ok());
+
+        let _ = fs::remove_file(db_path);
+    }
+
+    #[test]
     fn creates_reads_and_updates_actress_for_one_account() {
         let db_path = test_db_path("actress-crud");
         let first =
@@ -1345,6 +1533,27 @@ mod tests {
     }
 
     #[test]
+    fn rejects_duplicate_actress_names_for_one_account() {
+        let db_path = test_db_path("actress-duplicates");
+        let first =
+            register_account(&db_path, "DupAct", "abc123").expect("first account registers");
+        let second =
+            register_account(&db_path, "DupActTwo", "abc123").expect("second account registers");
+
+        create_actress(&db_path, &first.account_id, actress_input("Alice"))
+            .expect("first actress creates");
+
+        assert!(create_actress(&db_path, &first.account_id, actress_input(" alice ")).is_err());
+        assert!(create_actress(&db_path, &second.account_id, actress_input("Alice")).is_ok());
+
+        let mut input = actress_input("Different");
+        input.japanese_name = Some("Alice".to_string());
+        assert!(create_actress(&db_path, &first.account_id, input).is_err());
+
+        let _ = fs::remove_file(db_path);
+    }
+
+    #[test]
     fn manages_video_actress_links_and_delete_rules() {
         let db_path = test_db_path("associations");
         let session = register_account(&db_path, "AssocUser", "abc123").expect("account registers");
@@ -1410,16 +1619,7 @@ mod tests {
         .unwrap();
         let suggestions =
             list_association_suggestions(&db_path, &session.account_id, &later.id).unwrap();
-        assert_eq!(suggestions.len(), 1);
-        assert_eq!(suggestions[0].video.id, video.id);
-
-        add_video_actress(&db_path, &session.account_id, &video.id, &later.id)
-            .expect("suggestion can be confirmed");
-        assert!(
-            list_association_suggestions(&db_path, &session.account_id, &later.id)
-                .unwrap()
-                .is_empty()
-        );
+        assert!(suggestions.is_empty());
         assert_eq!(
             list_video_actresses(&db_path, &session.account_id, &video.id)
                 .unwrap()

@@ -6,6 +6,7 @@ import {
   exportEncryptedBackup,
   exportPlainBackup,
   getLlmSettings,
+  getStoredLlmApiKeyStatus,
   getAppDataPaths,
   importEncryptedBackup,
   importPlainBackup,
@@ -148,6 +149,14 @@ function LlmSettingsSection() {
           setIsLoading(false);
         }
       });
+
+    getStoredLlmApiKeyStatus(session.accountId)
+      .then((status) => {
+        if (isActive) {
+          setHasApiKey(status.hasApiKey);
+        }
+      })
+      .catch(() => undefined);
 
     return () => {
       isActive = false;

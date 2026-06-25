@@ -134,6 +134,11 @@ export type RecommendationPayload = {
   actresses: RecommendationActressCandidate[];
 };
 
+export type RecommendationResult = {
+  payload: RecommendationPayload;
+  text: string;
+};
+
 export type TranslationState = {
   videoId: string;
   translationStatus?: string;
